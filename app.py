@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
 
 # ==================================================
 # CONFIG
@@ -176,3 +179,87 @@ if uploaded_file:
             "Productivité équipe": "{:.1%}"
         })
     )
+    
+    # ==================================================
+    # TENDANCES & INFLUENCE DES ÉQUIPES
+    # ==================================================
+    st.header("Tendances et influence des équipes")
+    
+    # Calcul productivité globale mensuelle (déjà existante logiquement)
+    global_ts = (
+        df.groupby("Mois")
+        .agg(
+            heures_trav=("Heures_travaillées", "sum"),
+            heures_fact=("Heures_facturables", "sum")
+        )
+        .reset_index()
+    )
+    
+    global_ts["Productivité globale"] = (
+        global_ts["heures_fact"] / global_ts["heures_trav"]
+    )
+    
+    resultats_corr = []
+    
+    # Une figure par équipe
+    for equipe in sorted(df[COL_EQUIPE].unique()):
+    
+        df_eq = df[df[COL_EQUIPE] == equipe]
+    
+        eq_ts = (
+            df_eq.groupby("Mois")
+            .agg(
+                heures_trav=("Heures_travaillées", "sum"),
+                heures_fact=("Heures_facturables", "sum")
+            )
+            .reset_index()
+        )
+    
+        eq_ts["Productivité équipe"] = (
+            eq_ts["heures_fact"] / eq_ts["heures_trav"]
+        )
+    
+        # Fusion pour corrélation
+        merged = pd.merge(
+            global_ts[["Mois", "Productivité globale"]],
+            eq_ts[["Mois", "Productivité équipe"]],
+            on="Mois",
+            how="inner"
+        )
+    
+        # Corrélation
+        corr = merged["Productivité globale"].corr(
+            merged["Productivité équipe"]
+        )
+    
+        resultats_corr.append({
+            "Équipe": equipe,
+            "Corrélation avec le global": corr
+        })
+    
+        # ====== PLOT ======
+        fig, ax = plt.subplots(figsize=(8, 4))
+        sns.lineplot(
+            data=merged,
+            x="Mois",
+            y="Productivité globale",
+            label="Global",
+            ax=ax
+        )
+        sns.lineplot(
+            data=merged,
+            x="Mois",
+            y="Productivité équipe",
+            label=equipe,
+            ax=ax
+        )
+    
+        ax.set_title(
+            f"Tendance – {equipe} (corrélation = {corr:.2f})"
+        )
+        ax.set_ylabel("Productivité")
+        ax.set_xlabel("Mois")
+        ax.legend()
+    
+        st.pyplot(fig)
+    
