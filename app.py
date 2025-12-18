@@ -134,6 +134,41 @@ if uploaded_file:
         .reset_index()
         .style.format({"Productivité": "{:.1%}"})
     )
+
+        # =====================
+    # Productivité des équipes sélectionnées
+    # =====================
+    st.divider()
+    st.subheader("Productivité des équipes")
+
+    prod_equipes = (
+        df.groupby(COL_EQUIPE)
+        .agg(
+            heures_travaillees=("Heures_travaillées", "sum"),
+            heures_facturables=("Heures_facturables", "sum")
+        )
+        .reset_index()
+    )
+
+    prod_equipes["Productivité"] = (
+        prod_equipes["heures_facturables"] /
+        prod_equipes["heures_travaillees"]
+    )
+
+    prod_equipes = prod_equipes.sort_values(
+        "Productivité", ascending=False
+    )
+
+    # Graphique
+    st.bar_chart(
+        prod_equipes.set_index(COL_EQUIPE)["Productivité"]
+    )
+
+    # Tableau détail
+    st.dataframe(
+        prod_equipes
+        .style.format({"Productivité": "{:.1%}"})
+    )
         # =====================
     # Productivité par mois (TIMELINE)
     # =====================
