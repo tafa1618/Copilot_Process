@@ -15,7 +15,7 @@ def page_productivite():
     # ==================================================
     # HEADER
     # ==================================================
-    st.header("📊 Productivité – Pointages (Neemba Sénégal)")
+    st.header("📊 Productivité & Exhaustivité – Pointages (Neemba Sénégal)")
 
     # ==================================================
     # UPLOAD
