@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # CONFIG
 # ==================================================
 st.set_page_config(page_title="Sandbox Productivité", layout="wide")
-st.title("Sandbox – Productivité (Pointages Neemba Sénégal)")
+st.title("Productivité (Pointages Neemba Sénégal)")
 
 # ==================================================
 # UPLOAD
