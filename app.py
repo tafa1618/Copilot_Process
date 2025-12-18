@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import date
 
-# 🔗 IMPORT PAGE PRODUCTIVITÉ
+# Import pages KPI
 from kpis.productivite import page_productivite
 
 # ===============================
@@ -13,10 +13,16 @@ st.set_page_config(
 )
 
 # ===============================
-# INIT NAVIGATION
+# INIT SESSION STATE
 # ===============================
 if "page" not in st.session_state:
     st.session_state.page = "Accueil"
+
+if "productivite_globale" not in st.session_state:
+    st.session_state.productivite_globale = None
+
+if "productivite_calculee" not in st.session_state:
+    st.session_state.productivite_calculee = False
 
 # ===============================
 # HEADER GLOBAL
@@ -34,34 +40,48 @@ if st.session_state.page == "Accueil":
 
     st.markdown(
         """
-        Ce copilote fournit une **vue synthétique et actionnable**
-        de l’état de nos principaux **KPI opérationnels**.
+        Vue synthétique et opérationnelle de l’état des **KPI Méthode & Process**.
+        Les indicateurs se mettent à jour automatiquement dès que les données
+        sont chargées dans les modules dédiés.
         """
     )
-
-    # ===============================
-    # RÉSUMÉ KPI (placeholder)
-    # ===============================
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric("Productivité YTD", "77 %", delta="+2 %")
-        st.metric("Inspection Rate", "67.8 %", delta="-1.2 %")
-
-    with col2:
-        st.metric("Service Response", "85.3 %", delta="+0.8 %")
-        st.metric("PM Accuracy", "100 %", delta="+1 %")
-
-    with col3:
-        st.metric("CVA Fulfillment", "83.8 %", delta="+3 %")
-        st.metric("PIP", "9 / 9", delta="Stable")
 
     st.divider()
 
     # ===============================
-    # BOUTONS DE NAVIGATION
+    # RÉSUMÉ KPI
     # ===============================
-    st.subheader("🔎 Voir le détail par KPI")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        if st.session_state.productivite_calculee:
+            st.metric(
+                "Productivité YTD",
+                f"{st.session_state.productivite_globale:.1%}"
+            )
+        else:
+            st.metric(
+                "Productivité YTD",
+                "—",
+                help="Chargez le fichier de pointages pour calculer la productivité"
+            )
+
+        st.metric("Inspection Rate", "—")
+
+    with col2:
+        st.metric("Service Response", "—")
+        st.metric("PM Accuracy", "—")
+
+    with col3:
+        st.metric("CVA Fulfillment", "—")
+        st.metric("PIP", "—")
+
+    st.divider()
+
+    # ===============================
+    # NAVIGATION KPI
+    # ===============================
+    st.subheader("🔎 Accéder aux analyses détaillées")
 
     nav1, nav2, nav3 = st.columns(3)
 
@@ -87,7 +107,7 @@ if st.session_state.page == "Accueil":
             st.session_state.page = "PIP"
 
 # ===============================
-# PAGE PRODUCTIVITÉ (RÉELLE)
+# PAGE PRODUCTIVITÉ
 # ===============================
 elif st.session_state.page == "Productivité":
 
@@ -98,34 +118,34 @@ elif st.session_state.page == "Productivité":
         st.session_state.page = "Accueil"
 
 # ===============================
-# AUTRES PAGES KPI (PLACEHOLDERS)
+# AUTRES PAGES (PLACEHOLDERS)
 # ===============================
 elif st.session_state.page == "Efficience":
-    st.header("⚙️ Détail – Efficience OR")
-    st.info("Page Efficience à implémenter")
+    st.header("⚙️ Efficience OR")
+    st.info("Page à implémenter")
     if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
 
 elif st.session_state.page == "Inspection":
-    st.header("🔍 Détail – Inspection Rate")
-    st.info("Page Inspection à implémenter")
+    st.header("🔍 Inspection Rate")
+    st.info("Page à implémenter")
     if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
 
 elif st.session_state.page == "CVA":
-    st.header("📦 Détail – CVA Fulfillment")
-    st.info("Page CVA à implémenter")
+    st.header("📦 CVA Fulfillment")
+    st.info("Page à implémenter")
     if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
 
 elif st.session_state.page == "Service":
-    st.header("🛠️ Détail – Service Response")
-    st.info("Page Service à implémenter")
+    st.header("🛠️ Service Response")
+    st.info("Page à implémenter")
     if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
 
 elif st.session_state.page == "PIP":
-    st.header("🧪 Détail – PIP")
-    st.info("Page PIP à implémenter")
+    st.header("🧪 PIP")
+    st.info("Page à implémenter")
     if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
