@@ -1,6 +1,6 @@
 import streamlit as st
 from datetime import date
-from kpi.productivite import page_productivite
+from kpis.productivite import page_productivite
 
 # ==================================================
 # CONFIG
