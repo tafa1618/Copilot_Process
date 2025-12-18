@@ -115,8 +115,8 @@ if uploaded_file:
     st.divider()
     st.subheader("Évolution de la productivité par mois")
 
-    # Nom EXACT de la colonne date (⚠️ espace final important)
-    COL_DATE = "Saisie heures - Date "
+    # Nom EXACT de la colonne date
+    COL_DATE = "Saisie heures - Date"
 
     # Sécurisation date
     df[COL_DATE] = pd.to_datetime(df[COL_DATE], errors="coerce")
@@ -151,5 +151,3 @@ if uploaded_file:
     st.dataframe(
         prod_mois.style.format({"Productivité": "{:.1%}"})
     )
-
-
