@@ -18,6 +18,31 @@ if uploaded_file:
 
     st.divider()
 
+        # =====================
+    # Sélection des équipes
+    # =====================
+    st.subheader("Filtrer par équipe")
+
+    COL_EQUIPE = "Salarié - Equipe(Nom)"
+
+    equipes_disponibles = (
+        df[COL_EQUIPE]
+        .dropna()
+        .unique()
+        .tolist()
+    )
+
+    equipes_selectionnees = st.multiselect(
+        "Choisir les équipes à analyser",
+        options=sorted(equipes_disponibles),
+        default=sorted(equipes_disponibles)  # toutes par défaut
+    )
+
+    # Filtrage du dataset
+    if equipes_selectionnees:
+        df = df[df[COL_EQUIPE].isin(equipes_selectionnees)]
+
+
     # =====================
     # Mapping colonnes EXACT
     # =====================
