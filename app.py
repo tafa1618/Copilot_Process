@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-st.set_page_config(page_title="Sandbox Process KPI", layout="wide")
-st.title("Sandbox – Productivité & Efficience (Pointages)")
+st.set_page_config(page_title="Sandbox Productivité", layout="wide")
+st.title("Sandbox – Productivité (Pointages)")
 
 uploaded_file = st.file_uploader(
     "Charger le fichier de pointages (Excel)",
@@ -18,41 +18,95 @@ if uploaded_file:
 
     st.divider()
 
-    # 🔧 Mapping colonnes (à adapter si besoin)
-    COL_TEMPS_POINTE = "Temps pointé"
-    COL_TEMPS_VENDU = "Temps vendu"
-    COL_TEMPS_PREVU = "Temps prévu devis"
-    COL_TECHNICIEN = "Technicien"
+    # =====================
+    # Mapping colonnes EXACT
+    # =====================
+    COL_TECHNICIEN = "Salarié - Nom"
+    COL_EQUIPE = "Salarié - Equipe(Nom)"
+    COL_OR = "OR (Numéro)"
+    COL_FACTURABLE = "Facturable"       # NUMÉRIQUE (heures)
+    COL_HEURES = "Hr_travaillée"
 
-    for col in [COL_TEMPS_POINTE, COL_TEMPS_VENDU, COL_TEMPS_PREVU]:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+    # Sécurisation types
+    df[COL_HEURES] = pd.to_numeric(df[COL_HEURES], errors="coerce")
+    df[COL_FACTURABLE] = pd.to_numeric(df[COL_FACTURABLE], errors="coerce").fillna(0)
 
-    df["Temps_utilisé"] = np.where(
-        df[COL_TEMPS_VENDU].notna(),
-        df[COL_TEMPS_VENDU],
-        df[COL_TEMPS_PREVU]
+    # Calcul heures
+    df["Heures_travaillées"] = df[COL_HEURES]
+    df["Heures_facturables"] = df[COL_FACTURABLE]
+
+    # =====================
+    # KPI global
+    # =====================
+    total_travaille = df["Heures_travaillées"].sum()
+    total_facturable = df["Heures_facturables"].sum()
+
+    productivite_globale = (
+        total_facturable / total_travaille
+        if total_travaille > 0 else 0
     )
 
-    df["Efficience"] = df["Temps_utilisé"] / df[COL_TEMPS_POINTE]
+    st.subheader("Productivité globale")
+    st.metric("Productivité", f"{productivite_globale:.1%}")
 
-    df = df.replace([np.inf, -np.inf], np.nan)
-    df = df.dropna(subset=["Efficience"])
+    st.divider()
 
-    st.subheader("KPIs globaux")
-    st.metric("Efficience moyenne", round(df["Efficience"].mean(), 2))
-    st.metric("Nombre d’OR analysés", df.shape[0])
+    # =====================
+    # Productivité par technicien
+    # =====================
+    st.subheader("Productivité par technicien")
 
-    st.subheader("Efficience par technicien")
-    eff_tech = (
-        df.groupby(COL_TECHNICIEN)["Efficience"]
-        .mean()
-        .sort_values(ascending=False)
+    prod_tech = (
+        df.groupby(COL_TECHNICIEN)
+        .agg(
+            heures_travaillees=("Heures_travaillées", "sum"),
+            heures_facturables=("Heures_facturables", "sum")
+        )
     )
 
-    st.bar_chart(eff_tech)
+    prod_tech["Productivité"] = (
+        prod_tech["heures_facturables"] /
+        prod_tech["heures_travaillees"]
+    )
 
-    st.subheader("Détail OR")
+    prod_tech = prod_tech.sort_values("Productivité", ascending=False)
+
+    st.bar_chart(prod_tech["Productivité"])
+
+    st.divider()
+
+    # =====================
+    # Productivité par équipe
+    # =====================
+    st.subheader("Productivité par équipe")
+
+    prod_equipe = (
+        df.groupby(COL_EQUIPE)
+        .agg(
+            heures_travaillees=("Heures_travaillées", "sum"),
+            heures_facturables=("Heures_facturables", "sum")
+        )
+    )
+
+    prod_equipe["Productivité"] = (
+        prod_equipe["heures_facturables"] /
+        prod_equipe["heures_travaillees"]
+    )
+
+    prod_equipe = prod_equipe.sort_values("Productivité", ascending=False)
+
+    st.bar_chart(prod_equipe["Productivité"])
+
+    st.divider()
+
+    # =====================
+    # Tableau détail
+    # =====================
+    st.subheader("Détail productivité (Technicien)")
+
     st.dataframe(
-        df[[COL_TECHNICIEN, COL_TEMPS_POINTE, "Temps_utilisé", "Efficience"]]
-        .sort_values("Efficience")
+        prod_tech
+        .reset_index()
+        .style.format({"Productivité": "{:.1%}"})
     )
+
