@@ -109,4 +109,47 @@ if uploaded_file:
         .reset_index()
         .style.format({"Productivité": "{:.1%}"})
     )
+        # =====================
+    # Productivité par mois (TIMELINE)
+    # =====================
+    st.divider()
+    st.subheader("Évolution de la productivité par mois")
+
+    # Nom EXACT de la colonne date (⚠️ espace final important)
+    COL_DATE = "Saisie heures - Date "
+
+    # Sécurisation date
+    df[COL_DATE] = pd.to_datetime(df[COL_DATE], errors="coerce")
+
+    # Création colonne Mois
+    df["Mois"] = df[COL_DATE].dt.to_period("M").astype(str)
+
+    # Agrégation mensuelle
+    prod_mois = (
+        df.groupby("Mois")
+        .agg(
+            heures_travaillees=("Heures_travaillées", "sum"),
+            heures_facturables=("Heures_facturables", "sum")
+        )
+        .reset_index()
+    )
+
+    prod_mois["Productivité"] = (
+        prod_mois["heures_facturables"] /
+        prod_mois["heures_travaillees"]
+    )
+
+    # Tri chronologique
+    prod_mois = prod_mois.sort_values("Mois")
+
+    # Courbe temporelle
+    st.line_chart(
+        prod_mois.set_index("Mois")["Productivité"]
+    )
+
+    # Tableau détail
+    st.dataframe(
+        prod_mois.style.format({"Productivité": "{:.1%}"})
+    )
+
 
