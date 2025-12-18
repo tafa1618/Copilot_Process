@@ -96,7 +96,7 @@ if uploaded_file:
     # ==================================================
     st.subheader("Évolution mensuelle – Global")
 
-    prod_mois = (
+    prod_mois_global = (
         df.groupby("Mois")
         .agg(
             heures_trav=("Heures_travaillées", "sum"),
@@ -105,11 +105,19 @@ if uploaded_file:
         .reset_index()
     )
 
-    prod_mois["Productivité"] = prod_mois["heures_fact"] / prod_mois["heures_trav"]
-    prod_mois = prod_mois.sort_values("Mois")
+    prod_mois_global["Productivité globale"] = (
+        prod_mois_global["heures_fact"] / prod_mois_global["heures_trav"]
+    )
 
-    st.line_chart(prod_mois.set_index("Mois")["Productivité"])
-    st.dataframe(prod_mois.style.format({"Productivité": "{:.1%}"}))
+    prod_mois_global = prod_mois_global.sort_values("Mois")
+
+    st.line_chart(
+        prod_mois_global.set_index("Mois")["Productivité globale"]
+    )
+
+    st.dataframe(
+        prod_mois_global.style.format({"Productivité globale": "{:.1%}"})
+    )
     st.divider()
 
     # ==================================================
@@ -128,8 +136,14 @@ if uploaded_file:
     heures_fact_eq = df_eq["Heures_facturables"].sum()
     prod_eq = heures_fact_eq / heures_trav_eq if heures_trav_eq > 0 else 0
 
-    st.metric(f"Productivité – {equipe_choisie}", f"{prod_eq:.1%}")
+    st.metric(
+        f"Productivité – {equipe_choisie}",
+        f"{prod_eq:.1%}"
+    )
 
+    # ==================================================
+    # COMPARAISON TIMELINE – ÉQUIPE vs GLOBAL
+    # ==================================================
     prod_mois_eq = (
         df_eq.groupby("Mois")
         .agg(
@@ -139,9 +153,26 @@ if uploaded_file:
         .reset_index()
     )
 
-    prod_mois_eq["Productivité"] = prod_mois_eq["heures_fact"] / prod_mois_eq["heures_trav"]
-    prod_mois_eq = prod_mois_eq.sort_values("Mois")
+    prod_mois_eq["Productivité équipe"] = (
+        prod_mois_eq["heures_fact"] / prod_mois_eq["heures_trav"]
+    )
 
-    st.subheader("Évolution mensuelle – équipe sélectionnée")
-    st.line_chart(prod_mois_eq.set_index("Mois")["Productivité"])
-    st.dataframe(prod_mois_eq.style.format({"Productivité": "{:.1%}"}))
+    comparaison = pd.merge(
+        prod_mois_global[["Mois", "Productivité globale"]],
+        prod_mois_eq[["Mois", "Productivité équipe"]],
+        on="Mois",
+        how="inner"
+    ).sort_values("Mois")
+
+    st.subheader(f"Évolution mensuelle – {equipe_choisie} vs Global")
+
+    st.line_chart(
+        comparaison.set_index("Mois")
+    )
+
+    st.dataframe(
+        comparaison.style.format({
+            "Productivité globale": "{:.1%}",
+            "Productivité équipe": "{:.1%}"
+        })
+    )
