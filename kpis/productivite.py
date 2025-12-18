@@ -5,21 +5,30 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 
-# ==================================================
-# CONFIG
-# ==================================================
-st.set_page_config(page_title="Sandbox Productivité", layout="wide")
-st.title("Productivité (Pointages Neemba Sénégal)")
+def page_productivite():
+    # ==================================================
+    # STYLE GRAPHIQUE
+    # ==================================================
+    sns.set_theme(style="whitegrid")
 
-# ==================================================
-# UPLOAD
-# ==================================================
-uploaded_file = st.file_uploader(
-    "Charger le fichier de pointages (Excel)",
-    type=["xlsx"]
-)
+    # ==================================================
+    # HEADER
+    # ==================================================
+    st.header("📊 Productivité – Pointages (Neemba Sénégal)")
 
-if uploaded_file:
+    # ==================================================
+    # UPLOAD
+    # ==================================================
+    uploaded_file = st.file_uploader(
+        "Charger le fichier de pointages (Excel)",
+        type=["xlsx"],
+        key="productivite_pointages"
+    )
+
+    if not uploaded_file:
+        st.info("Veuillez charger le fichier de pointages.")
+        return
+
     df = pd.read_excel(uploaded_file)
 
     st.subheader("Aperçu des données")
@@ -44,7 +53,8 @@ if uploaded_file:
     equipes_selectionnees = st.multiselect(
         "Choisir les équipes à analyser",
         options=equipes_disponibles,
-        default=equipes_disponibles
+        default=equipes_disponibles,
+        key="productivite_equipes"
     )
 
     if equipes_selectionnees:
@@ -75,7 +85,7 @@ if uploaded_file:
     st.divider()
 
     # ==================================================
-    # PRODUCTIVITÉ PAR TECHNICIEN
+    # PRODUCTIVITÉ PAR TECHNICIEN (BARPLOT)
     # ==================================================
     st.subheader("Productivité par technicien")
 
@@ -85,17 +95,37 @@ if uploaded_file:
             heures_trav=("Heures_travaillées", "sum"),
             heures_fact=("Heures_facturables", "sum")
         )
+        .reset_index()
     )
 
-    prod_tech["Productivité"] = prod_tech["heures_fact"] / prod_tech["heures_trav"]
+    prod_tech["Productivité"] = (
+        prod_tech["heures_fact"] / prod_tech["heures_trav"]
+    )
+
     prod_tech = prod_tech.sort_values("Productivité", ascending=False)
 
-    st.bar_chart(prod_tech["Productivité"])
-    st.dataframe(prod_tech.style.format({"Productivité": "{:.1%}"}))
+    fig, ax = plt.subplots(figsize=(10, 5))
+    sns.barplot(
+        data=prod_tech,
+        x=COL_TECHNICIEN,
+        y="Productivité",
+        ax=ax
+    )
+    ax.set_title("Productivité par technicien")
+    ax.set_ylabel("Productivité")
+    ax.set_xlabel("")
+    ax.tick_params(axis="x", rotation=45)
+
+    st.pyplot(fig)
+
+    st.dataframe(
+        prod_tech.style.format({"Productivité": "{:.1%}"})
+    )
+
     st.divider()
 
     # ==================================================
-    # TIMELINE GLOBALE
+    # TIMELINE GLOBALE (LINEPLOT)
     # ==================================================
     st.subheader("Évolution mensuelle – Global")
 
@@ -106,21 +136,33 @@ if uploaded_file:
             heures_fact=("Heures_facturables", "sum")
         )
         .reset_index()
+        .sort_values("Mois")
     )
 
     prod_mois_global["Productivité globale"] = (
         prod_mois_global["heures_fact"] / prod_mois_global["heures_trav"]
     )
 
-    prod_mois_global = prod_mois_global.sort_values("Mois")
-
-    st.line_chart(
-        prod_mois_global.set_index("Mois")["Productivité globale"]
+    fig, ax = plt.subplots(figsize=(10, 4))
+    sns.lineplot(
+        data=prod_mois_global,
+        x="Mois",
+        y="Productivité globale",
+        marker="o",
+        ax=ax
     )
+
+    ax.set_title("Évolution mensuelle de la productivité globale")
+    ax.set_ylabel("Productivité")
+    ax.set_xlabel("Mois")
+    ax.tick_params(axis="x", rotation=45)
+
+    st.pyplot(fig)
 
     st.dataframe(
         prod_mois_global.style.format({"Productivité globale": "{:.1%}"})
     )
+
     st.divider()
 
     # ==================================================
@@ -130,7 +172,8 @@ if uploaded_file:
 
     equipe_choisie = st.selectbox(
         "Choisir une équipe",
-        options=sorted(df[COL_EQUIPE].dropna().unique())
+        options=sorted(df[COL_EQUIPE].dropna().unique()),
+        key="productivite_focus_equipe"
     )
 
     df_eq = df[df[COL_EQUIPE] == equipe_choisie]
@@ -167,11 +210,31 @@ if uploaded_file:
         how="inner"
     ).sort_values("Mois")
 
-    st.subheader(f"Évolution mensuelle – {equipe_choisie} vs Global")
-
-    st.line_chart(
-        comparaison.set_index("Mois")
+    fig, ax = plt.subplots(figsize=(10, 4))
+    sns.lineplot(
+        data=comparaison,
+        x="Mois",
+        y="Productivité globale",
+        label="Global",
+        ax=ax
     )
+    sns.lineplot(
+        data=comparaison,
+        x="Mois",
+        y="Productivité équipe",
+        label=equipe_choisie,
+        ax=ax
+    )
+
+    ax.set_title(
+        f"Comparaison de tendance – {equipe_choisie} vs Global"
+    )
+    ax.set_ylabel("Productivité")
+    ax.set_xlabel("Mois")
+    ax.tick_params(axis="x", rotation=45)
+    ax.legend()
+
+    st.pyplot(fig)
 
     st.dataframe(
         comparaison.style.format({
@@ -179,107 +242,3 @@ if uploaded_file:
             "Productivité équipe": "{:.1%}"
         })
     )
-    
-    # ==================================================
-    # TENDANCES & INFLUENCE DES ÉQUIPES (VUE COMPACTE)
-    # ==================================================
-    st.header("Tendances et influence des équipes")
-
-    # Série globale mensuelle (référence)
-    global_ts = (
-        df.groupby("Mois")
-        .agg(
-            heures_trav=("Heures_travaillées", "sum"),
-            heures_fact=("Heures_facturables", "sum")
-        )
-        .reset_index()
-    )
-
-    global_ts["Global"] = (
-        global_ts["heures_fact"] / global_ts["heures_trav"]
-    )
-
-    # Équipes concernées (celles filtrées en haut)
-    equipes = sorted(df[COL_EQUIPE].dropna().unique())
-
-    # Stockage des corrélations
-    correlations = {}
-
-    # Grille : 2 cartes par ligne
-    NB_COLS = 2
-    cols = st.columns(NB_COLS)
-
-    for i, equipe in enumerate(equipes):
-        with cols[i % NB_COLS]:
-
-            df_eq = df[df[COL_EQUIPE] == equipe]
-
-            eq_ts = (
-                df_eq.groupby("Mois")
-                .agg(
-                    heures_trav=("Heures_travaillées", "sum"),
-                    heures_fact=("Heures_facturables", "sum")
-                )
-                .reset_index()
-            )
-
-            eq_ts["Equipe"] = (
-                eq_ts["heures_fact"] / eq_ts["heures_trav"]
-            )
-
-            # Fusion équipe vs global
-            merged = pd.merge(
-                global_ts[["Mois", "Global"]],
-                eq_ts[["Mois", "Equipe"]],
-                on="Mois",
-                how="inner"
-            ).sort_values("Mois")
-
-            # Corrélation
-            corr = merged["Global"].corr(merged["Equipe"])
-            correlations[equipe] = corr
-
-            # -------- MINI-PLOT --------
-            fig, ax = plt.subplots(figsize=(4.5, 3))
-
-            sns.lineplot(
-                data=merged,
-                x="Mois",
-                y="Global",
-                label="Global",
-                ax=ax
-            )
-            sns.lineplot(
-                data=merged,
-                x="Mois",
-                y="Equipe",
-                label=equipe,
-                ax=ax
-            )
-
-            ax.set_title(
-                f"{equipe}\nCorrélation = {corr:.2f}",
-                fontsize=10
-            )
-            ax.set_xlabel("")
-            ax.set_ylabel("Prod.")
-            ax.tick_params(axis="x", rotation=45)
-            ax.legend(fontsize=8)
-
-            st.pyplot(fig)
-
-    # ==================================================
-    # COMMENTAIRE AUTOMATIQUE – ÉQUIPE DRIVER
-    # ==================================================
-    if correlations:
-        equipe_driver = max(correlations, key=correlations.get)
-        corr_max = correlations[equipe_driver]
-
-        st.info(
-            f"📌 **Analyse d’influence**\n\n"
-            f"L’équipe **{equipe_driver}** est celle dont la productivité est "
-            f"la plus corrélée à la performance globale "
-            f"(corrélation = {corr_max:.2f}).\n\n"
-            f"👉 Son évolution constitue un **indicateur avancé** "
-            f"de la productivité globale."
-        )
