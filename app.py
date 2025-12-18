@@ -280,6 +280,6 @@ if uploaded_file:
             f"L’équipe **{equipe_driver}** est celle dont la productivité est "
             f"la plus corrélée à la performance globale "
             f"(corrélation = {corr_max:.2f}).\n\n"
-            f"👉 Son évolution constitue un **bon indicateur avancé** "
+            f"👉 Son évolution constitue un **indicateur avancé** "
             f"de la productivité globale."
         )
