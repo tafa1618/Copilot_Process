@@ -3,11 +3,12 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
 
 def page_productivite():
     # ==================================================
-    # STYLE GRAPHIQUE
+    # STYLE
     # ==================================================
     sns.set_theme(style="whitegrid")
 
@@ -43,6 +44,7 @@ def page_productivite():
     COL_FACTURABLE = "Facturable"
     COL_HEURES = "Hr_travaillée"
     COL_DATE = "Saisie heures - Date"
+    COL_OR = "OR (Numéro)"
 
     # ==================================================
     # FILTRE GLOBAL PAR ÉQUIPE
@@ -65,14 +67,96 @@ def page_productivite():
     # ==================================================
     # PRÉPARATION DONNÉES
     # ==================================================
-    df[COL_HEURES] = pd.to_numeric(df[COL_HEURES], errors="coerce")
+    df[COL_HEURES] = pd.to_numeric(df[COL_HEURES], errors="coerce").fillna(0)
     df[COL_FACTURABLE] = pd.to_numeric(df[COL_FACTURABLE], errors="coerce").fillna(0)
     df[COL_DATE] = pd.to_datetime(df[COL_DATE], errors="coerce")
 
     df["Heures_travaillées"] = df[COL_HEURES]
     df["Heures_facturables"] = df[COL_FACTURABLE]
     df["Mois"] = df[COL_DATE].dt.to_period("M").astype(str)
+    df["Jour"] = df[COL_DATE].dt.day
+    df["Jour_semaine"] = df[COL_DATE].dt.weekday  # 0=lundi
 
+    # ==================================================
+    # 1️⃣ EXHAUSTIVITÉ DES POINTAGES – CALENDRIER
+    # ==================================================
+    st.header("🗓️ Exhaustivité des pointages – Contrôle journalier")
+
+    equipe_cal = st.selectbox(
+        "Choisir une équipe à auditer",
+        options=sorted(df[COL_EQUIPE].dropna().unique()),
+        key="exhaustivite_equipe"
+    )
+
+    df_cal = df[df[COL_EQUIPE] == equipe_cal].copy()
+
+    daily = (
+        df_cal
+        .groupby([COL_DATE, COL_TECHNICIEN])
+        .agg(heures=("Heures_travaillées", "sum"))
+        .reset_index()
+    )
+
+    daily["Jour"] = daily[COL_DATE].dt.day
+    daily["Jour_semaine"] = daily[COL_DATE].dt.weekday
+
+    def statut_pointage(row):
+        h = row["heures"]
+        wd = row["Jour_semaine"]
+
+        if wd >= 5:  # Samedi / Dimanche
+            return "Weekend OK" if h == 0 else "Travail weekend"
+        else:
+            if h == 0:
+                return "Non conforme"
+            elif h < 8:
+                return "Incomplet"
+            elif h == 8:
+                return "Conforme"
+            else:
+                return "Surpointage"
+
+    daily["Statut"] = daily.apply(statut_pointage, axis=1)
+
+    pivot = daily.pivot(
+        index="Jour",
+        columns=COL_TECHNICIEN,
+        values="Statut"
+    )
+
+    color_map = {
+        "Non conforme": "#d73027",     # rouge
+        "Incomplet": "#fee08b",        # jaune
+        "Conforme": "#1a9850",         # vert
+        "Surpointage": "#4575b4",      # bleu
+        "Weekend OK": "#f0f0f0",       # gris
+        "Travail weekend": "#984ea3"   # violet
+    }
+
+    color_matrix = pivot.applymap(lambda x: color_map.get(x, "#ffffff"))
+
+    fig, ax = plt.subplots(
+        figsize=(max(8, len(pivot.columns) * 0.6), 6)
+    )
+
+    ax.imshow(
+        color_matrix.applymap(lambda c: list(mcolors.to_rgb(c))).values,
+        aspect="auto"
+    )
+    ax.set_xticks(range(len(pivot.columns)))
+    ax.set_xticklabels(pivot.columns, rotation=45, ha="right")
+
+    ax.set_yticks(range(len(pivot.index)))
+    ax.set_yticklabels(pivot.index)
+
+    ax.set_xlabel("Techniciens")
+    ax.set_ylabel("Jour du mois")
+    ax.set_title(f"Exhaustivité des pointages – {equipe_cal}")
+
+    st.pyplot(fig)
+    st.divider()
+
+   
     # ==================================================
     # KPI GLOBAL
     # ==================================================
