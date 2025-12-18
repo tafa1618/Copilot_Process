@@ -180,32 +180,37 @@ if uploaded_file:
         })
     )
     
-    # ==================================================
-    # TENDANCES & INFLUENCE DES ÉQUIPES
-    # ==================================================
-    st.header("Tendances et influence des équipes")
-    
-    # Calcul productivité globale mensuelle (déjà existante logiquement)
-    global_ts = (
-        df.groupby("Mois")
-        .agg(
-            heures_trav=("Heures_travaillées", "sum"),
-            heures_fact=("Heures_facturables", "sum")
-        )
-        .reset_index()
+# ==================================================
+# TENDANCES & INFLUENCE DES ÉQUIPES (VUE COMPACTE)
+# ==================================================
+st.header("Tendances et influence des équipes")
+
+# Série globale mensuelle (référence)
+global_ts = (
+    df.groupby("Mois")
+    .agg(
+        heures_trav=("Heures_travaillées", "sum"),
+        heures_fact=("Heures_facturables", "sum")
     )
-    
-    global_ts["Productivité globale"] = (
-        global_ts["heures_fact"] / global_ts["heures_trav"]
-    )
-    
-    resultats_corr = []
-    
-    # Une figure par équipe
-    for equipe in sorted(df[COL_EQUIPE].unique()):
-    
+    .reset_index()
+)
+
+global_ts["Global"] = (
+    global_ts["heures_fact"] / global_ts["heures_trav"]
+)
+
+# Équipes concernées (celles filtrées en haut)
+equipes = sorted(df[COL_EQUIPE].dropna().unique())
+
+# Grille : 2 cartes par ligne (lisible)
+NB_COLS = 2
+cols = st.columns(NB_COLS)
+
+for i, equipe in enumerate(equipes):
+    with cols[i % NB_COLS]:
+
         df_eq = df[df[COL_EQUIPE] == equipe]
-    
+
         eq_ts = (
             df_eq.groupby("Mois")
             .agg(
@@ -214,52 +219,47 @@ if uploaded_file:
             )
             .reset_index()
         )
-    
-        eq_ts["Productivité équipe"] = (
+
+        eq_ts["Equipe"] = (
             eq_ts["heures_fact"] / eq_ts["heures_trav"]
         )
-    
-        # Fusion pour corrélation
+
+        # Fusion équipe vs global
         merged = pd.merge(
-            global_ts[["Mois", "Productivité globale"]],
-            eq_ts[["Mois", "Productivité équipe"]],
+            global_ts[["Mois", "Global"]],
+            eq_ts[["Mois", "Equipe"]],
             on="Mois",
             how="inner"
-        )
-    
+        ).sort_values("Mois")
+
         # Corrélation
-        corr = merged["Productivité globale"].corr(
-            merged["Productivité équipe"]
-        )
-    
-        resultats_corr.append({
-            "Équipe": equipe,
-            "Corrélation avec le global": corr
-        })
-    
-        # ====== PLOT ======
-        fig, ax = plt.subplots(figsize=(8, 4))
+        corr = merged["Global"].corr(merged["Equipe"])
+
+        # -------- MINI-PLOT --------
+        fig, ax = plt.subplots(figsize=(4.5, 3))
+
         sns.lineplot(
             data=merged,
             x="Mois",
-            y="Productivité globale",
+            y="Global",
             label="Global",
             ax=ax
         )
         sns.lineplot(
             data=merged,
             x="Mois",
-            y="Productivité équipe",
+            y="Equipe",
             label=equipe,
             ax=ax
         )
-    
+
         ax.set_title(
-            f"Tendance – {equipe} (corrélation = {corr:.2f})"
+            f"{equipe}\nCorrélation = {corr:.2f}",
+            fontsize=10
         )
-        ax.set_ylabel("Productivité")
-        ax.set_xlabel("Mois")
-        ax.legend()
-    
+        ax.set_xlabel("")
+        ax.set_ylabel("Prod.")
+        ax.tick_params(axis="x", rotation=45)
+        ax.legend(fontsize=8)
+
         st.pyplot(fig)
-    
