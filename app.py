@@ -50,7 +50,7 @@ if st.session_state.page == "Accueil":
 
     with col2:
         st.metric("Service Response", "85.3 %", delta="+0.8 %")
-        st.metric("PM Accuracy", "96 %", delta="+1 %")
+        st.metric("PM Accuracy", "100 %", delta="+1 %")
 
     with col3:
         st.metric("CVA Fulfillment", "83.8 %", delta="+3 %")
