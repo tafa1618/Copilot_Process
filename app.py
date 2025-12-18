@@ -1,285 +1,112 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
+from datetime import date
 
-
-# ==================================================
+# ===============================
 # CONFIG
-# ==================================================
-st.set_page_config(page_title="Sandbox Productivité", layout="wide")
-st.title("Productivité (Pointages Neemba Sénégal)")
-
-# ==================================================
-# UPLOAD
-# ==================================================
-uploaded_file = st.file_uploader(
-    "Charger le fichier de pointages (Excel)",
-    type=["xlsx"]
+# ===============================
+st.set_page_config(
+    page_title="Copilote Méthode & Process – Neemba Sénégal",
+    layout="wide"
 )
 
-if uploaded_file:
-    df = pd.read_excel(uploaded_file)
+# ===============================
+# INIT NAVIGATION
+# ===============================
+if "page" not in st.session_state:
+    st.session_state.page = "Accueil"
 
-    st.subheader("Aperçu des données")
-    st.dataframe(df.head())
+# ===============================
+# HEADER GLOBAL
+# ===============================
+st.title("🧭 Copilote – Méthode & Process | Neemba Sénégal")
+st.caption(f"Situation des KPI YTD – au {date.today().strftime('%d/%m/%Y')}")
+
+st.divider()
+
+# ===============================
+# PAGE ACCUEIL
+# ===============================
+if st.session_state.page == "Accueil":
+
+    st.subheader("👋 Bienvenue dans le Copilote Méthode & Process")
+
+    st.markdown(
+        """
+        Ce copilote fournit une **vue synthétique et actionnable**
+        de l’état de nos principaux **KPI opérationnels**.
+        """
+    )
+
+    # ===============================
+    # RÉSUMÉ KPI (placeholder valeurs)
+    # ===============================
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("Productivité YTD", "77 %", delta="+2 %")
+        st.metric("Inspection Rate", "67.8 %", delta="-1.2 %")
+
+    with col2:
+        st.metric("Service Response", "85.3 %", delta="+0.8 %")
+        st.metric("PM Accuracy", "96 %", delta="+1 %")
+
+    with col3:
+        st.metric("CVA Fulfillment", "83.8 %", delta="+3 %")
+        st.metric("PIP", "9 / 9", delta="Stable")
+
     st.divider()
 
-    # ==================================================
-    # CONSTANTES COLONNES
-    # ==================================================
-    COL_TECHNICIEN = "Salarié - Nom"
-    COL_EQUIPE = "Salarié - Equipe(Nom)"
-    COL_FACTURABLE = "Facturable"
-    COL_HEURES = "Hr_travaillée"
-    COL_DATE = "Saisie heures - Date"
+    # ===============================
+    # BOUTONS DE NAVIGATION
+    # ===============================
+    st.subheader("🔎 Voir le détail par KPI")
 
-    # ==================================================
-    # FILTRE GLOBAL PAR ÉQUIPE
-    # ==================================================
-    st.subheader("Filtrer par équipe")
+    nav1, nav2, nav3 = st.columns(3)
 
-    equipes_disponibles = sorted(df[COL_EQUIPE].dropna().unique())
-    equipes_selectionnees = st.multiselect(
-        "Choisir les équipes à analyser",
-        options=equipes_disponibles,
-        default=equipes_disponibles
-    )
+    with nav1:
+        if st.button("📊 Productivité"):
+            st.session_state.page = "Productivité"
 
-    if equipes_selectionnees:
-        df = df[df[COL_EQUIPE].isin(equipes_selectionnees)]
+        if st.button("⚙️ Efficience"):
+            st.session_state.page = "Efficience"
 
-    st.divider()
+    with nav2:
+        if st.button("🔍 Inspection Rate"):
+            st.session_state.page = "Inspection"
 
-    # ==================================================
-    # PRÉPARATION DONNÉES
-    # ==================================================
-    df[COL_HEURES] = pd.to_numeric(df[COL_HEURES], errors="coerce")
-    df[COL_FACTURABLE] = pd.to_numeric(df[COL_FACTURABLE], errors="coerce").fillna(0)
-    df[COL_DATE] = pd.to_datetime(df[COL_DATE], errors="coerce")
+        if st.button("📦 CVA Fulfillment"):
+            st.session_state.page = "CVA"
 
-    df["Heures_travaillées"] = df[COL_HEURES]
-    df["Heures_facturables"] = df[COL_FACTURABLE]
-    df["Mois"] = df[COL_DATE].dt.to_period("M").astype(str)
+    with nav3:
+        if st.button("🛠️ Service Response"):
+            st.session_state.page = "Service"
 
-    # ==================================================
-    # KPI GLOBAL
-    # ==================================================
-    total_trav = df["Heures_travaillées"].sum()
-    total_fact = df["Heures_facturables"].sum()
-    prod_global = total_fact / total_trav if total_trav > 0 else 0
+        if st.button("🧪 PIP"):
+            st.session_state.page = "PIP"
 
-    st.subheader("Productivité globale")
-    st.metric("Productivité", f"{prod_global:.1%}")
-    st.divider()
+# ===============================
+# PAGES KPI (PLACEHOLDERS)
+# ===============================
+elif st.session_state.page == "Productivité":
+    st.header("📊 Détail – Productivité")
+    st.button("⬅️ Retour à l’accueil", on_click=lambda: st.session_state.update(page="Accueil"))
 
-    # ==================================================
-    # PRODUCTIVITÉ PAR TECHNICIEN
-    # ==================================================
-    st.subheader("Productivité par technicien")
+elif st.session_state.page == "Efficience":
+    st.header("⚙️ Détail – Efficience OR")
+    st.button("⬅️ Retour à l’accueil", on_click=lambda: st.session_state.update(page="Accueil"))
 
-    prod_tech = (
-        df.groupby(COL_TECHNICIEN)
-        .agg(
-            heures_trav=("Heures_travaillées", "sum"),
-            heures_fact=("Heures_facturables", "sum")
-        )
-    )
+elif st.session_state.page == "Inspection":
+    st.header("🔍 Détail – Inspection Rate")
+    st.button("⬅️ Retour à l’accueil", on_click=lambda: st.session_state.update(page="Accueil"))
 
-    prod_tech["Productivité"] = prod_tech["heures_fact"] / prod_tech["heures_trav"]
-    prod_tech = prod_tech.sort_values("Productivité", ascending=False)
+elif st.session_state.page == "CVA":
+    st.header("📦 Détail – CVA Fulfillment")
+    st.button("⬅️ Retour à l’accueil", on_click=lambda: st.session_state.update(page="Accueil"))
 
-    st.bar_chart(prod_tech["Productivité"])
-    st.dataframe(prod_tech.style.format({"Productivité": "{:.1%}"}))
-    st.divider()
+elif st.session_state.page == "Service":
+    st.header("🛠️ Détail – Service Response")
+    st.button("⬅️ Retour à l’accueil", on_click=lambda: st.session_state.update(page="Accueil"))
 
-    # ==================================================
-    # TIMELINE GLOBALE
-    # ==================================================
-    st.subheader("Évolution mensuelle – Global")
-
-    prod_mois_global = (
-        df.groupby("Mois")
-        .agg(
-            heures_trav=("Heures_travaillées", "sum"),
-            heures_fact=("Heures_facturables", "sum")
-        )
-        .reset_index()
-    )
-
-    prod_mois_global["Productivité globale"] = (
-        prod_mois_global["heures_fact"] / prod_mois_global["heures_trav"]
-    )
-
-    prod_mois_global = prod_mois_global.sort_values("Mois")
-
-    st.line_chart(
-        prod_mois_global.set_index("Mois")["Productivité globale"]
-    )
-
-    st.dataframe(
-        prod_mois_global.style.format({"Productivité globale": "{:.1%}"})
-    )
-    st.divider()
-
-    # ==================================================
-    # ANALYSE FOCALISÉE – UNE ÉQUIPE
-    # ==================================================
-    st.header("Analyse détaillée d’une équipe")
-
-    equipe_choisie = st.selectbox(
-        "Choisir une équipe",
-        options=sorted(df[COL_EQUIPE].dropna().unique())
-    )
-
-    df_eq = df[df[COL_EQUIPE] == equipe_choisie]
-
-    heures_trav_eq = df_eq["Heures_travaillées"].sum()
-    heures_fact_eq = df_eq["Heures_facturables"].sum()
-    prod_eq = heures_fact_eq / heures_trav_eq if heures_trav_eq > 0 else 0
-
-    st.metric(
-        f"Productivité – {equipe_choisie}",
-        f"{prod_eq:.1%}"
-    )
-
-    # ==================================================
-    # COMPARAISON TIMELINE – ÉQUIPE vs GLOBAL
-    # ==================================================
-    prod_mois_eq = (
-        df_eq.groupby("Mois")
-        .agg(
-            heures_trav=("Heures_travaillées", "sum"),
-            heures_fact=("Heures_facturables", "sum")
-        )
-        .reset_index()
-    )
-
-    prod_mois_eq["Productivité équipe"] = (
-        prod_mois_eq["heures_fact"] / prod_mois_eq["heures_trav"]
-    )
-
-    comparaison = pd.merge(
-        prod_mois_global[["Mois", "Productivité globale"]],
-        prod_mois_eq[["Mois", "Productivité équipe"]],
-        on="Mois",
-        how="inner"
-    ).sort_values("Mois")
-
-    st.subheader(f"Évolution mensuelle – {equipe_choisie} vs Global")
-
-    st.line_chart(
-        comparaison.set_index("Mois")
-    )
-
-    st.dataframe(
-        comparaison.style.format({
-            "Productivité globale": "{:.1%}",
-            "Productivité équipe": "{:.1%}"
-        })
-    )
-    
-    # ==================================================
-    # TENDANCES & INFLUENCE DES ÉQUIPES (VUE COMPACTE)
-    # ==================================================
-    st.header("Tendances et influence des équipes")
-
-    # Série globale mensuelle (référence)
-    global_ts = (
-        df.groupby("Mois")
-        .agg(
-            heures_trav=("Heures_travaillées", "sum"),
-            heures_fact=("Heures_facturables", "sum")
-        )
-        .reset_index()
-    )
-
-    global_ts["Global"] = (
-        global_ts["heures_fact"] / global_ts["heures_trav"]
-    )
-
-    # Équipes concernées (celles filtrées en haut)
-    equipes = sorted(df[COL_EQUIPE].dropna().unique())
-
-    # Stockage des corrélations
-    correlations = {}
-
-    # Grille : 2 cartes par ligne
-    NB_COLS = 2
-    cols = st.columns(NB_COLS)
-
-    for i, equipe in enumerate(equipes):
-        with cols[i % NB_COLS]:
-
-            df_eq = df[df[COL_EQUIPE] == equipe]
-
-            eq_ts = (
-                df_eq.groupby("Mois")
-                .agg(
-                    heures_trav=("Heures_travaillées", "sum"),
-                    heures_fact=("Heures_facturables", "sum")
-                )
-                .reset_index()
-            )
-
-            eq_ts["Equipe"] = (
-                eq_ts["heures_fact"] / eq_ts["heures_trav"]
-            )
-
-            # Fusion équipe vs global
-            merged = pd.merge(
-                global_ts[["Mois", "Global"]],
-                eq_ts[["Mois", "Equipe"]],
-                on="Mois",
-                how="inner"
-            ).sort_values("Mois")
-
-            # Corrélation
-            corr = merged["Global"].corr(merged["Equipe"])
-            correlations[equipe] = corr
-
-            # -------- MINI-PLOT --------
-            fig, ax = plt.subplots(figsize=(4.5, 3))
-
-            sns.lineplot(
-                data=merged,
-                x="Mois",
-                y="Global",
-                label="Global",
-                ax=ax
-            )
-            sns.lineplot(
-                data=merged,
-                x="Mois",
-                y="Equipe",
-                label=equipe,
-                ax=ax
-            )
-
-            ax.set_title(
-                f"{equipe}\nCorrélation = {corr:.2f}",
-                fontsize=10
-            )
-            ax.set_xlabel("")
-            ax.set_ylabel("Prod.")
-            ax.tick_params(axis="x", rotation=45)
-            ax.legend(fontsize=8)
-
-            st.pyplot(fig)
-
-    # ==================================================
-    # COMMENTAIRE AUTOMATIQUE – ÉQUIPE DRIVER
-    # ==================================================
-    if correlations:
-        equipe_driver = max(correlations, key=correlations.get)
-        corr_max = correlations[equipe_driver]
-
-        st.info(
-            f"📌 **Analyse d’influence**\n\n"
-            f"L’équipe **{equipe_driver}** est celle dont la productivité est "
-            f"la plus corrélée à la performance globale "
-            f"(corrélation = {corr_max:.2f}).\n\n"
-            f"👉 Son évolution constitue un **indicateur avancé** "
-            f"de la productivité globale."
-        )
+elif st.session_state.page == "PIP":
+    st.header("🧪 Détail – PIP")
+    st.button("⬅️ Retour à l’accueil", on_click=lambda: st.session_state.update(page="Accueil"))
