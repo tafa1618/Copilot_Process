@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 
 st.set_page_config(page_title="Sandbox Productivité", layout="wide")
-st.title("Sandbox – Productivité (Pointages)")
+st.title("Sandbox – Productivité (Pointages Neemba Sénégal)")
 
 uploaded_file = st.file_uploader(
     "Charger le fichier de pointages (Excel)",
