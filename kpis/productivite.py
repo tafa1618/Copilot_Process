@@ -87,34 +87,75 @@ def page_productivite():
     st.divider()
 
         # ==================================================
-    # 1️⃣ EXHAUSTIVITÉ DES POINTAGES – CALENDRIER
+        # ==================================================
+    # 1️⃣ EXHAUSTIVITÉ DES POINTAGES – CONTRÔLE MENSUEL
     # ==================================================
     st.header("🗓️ Exhaustivité des pointages")
 
+    # -------------------------------
+    # Choix de l’équipe
+    # -------------------------------
     equipe_audit = st.selectbox(
         "Choisir une équipe à auditer",
         options=sorted(df[COL_EQUIPE].dropna().unique()),
         key="exhaustivite_equipe"
     )
 
-    df_cal = df[df[COL_EQUIPE] == equipe_audit].copy()
+    # -------------------------------
+    # Choix du mois
+    # -------------------------------
+    df["Mois_periode"] = df[COL_DATE].dt.to_period("M")
 
-    # --------------------------------------------------
-    # AGRÉGATION : 1 ligne / jour / technicien
-    # --------------------------------------------------
+    mois_disponibles = (
+        df["Mois_periode"]
+        .dropna()
+        .astype(str)
+        .unique()
+        .tolist()
+    )
+    mois_disponibles = sorted(mois_disponibles)
+
+    mois_choisi_str = st.selectbox(
+        "Choisir le mois à vérifier",
+        options=mois_disponibles,
+        index=len(mois_disponibles) - 1
+    )
+
+    mois_choisi = pd.Period(mois_choisi_str, freq="M")
+
+    # -------------------------------
+    # Filtrage sécurisé
+    # -------------------------------
+    df_cal = df[
+        (df[COL_EQUIPE] == equipe_audit) &
+        (df[COL_DATE].dt.to_period("M") == mois_choisi)
+    ].copy()
+
+    if df_cal.empty:
+        st.warning(
+            f"Aucun pointage trouvé pour {equipe_audit} "
+            f"sur le mois {mois_choisi}."
+        )
+        st.divider()
+        return
+
+    # -------------------------------
+    # Agrégation : 1 ligne / jour / technicien
+    # -------------------------------
     daily = (
         df_cal
         .groupby([COL_DATE, COL_TECHNICIEN], as_index=False)
         .agg(
-            heures=("Heures_travaillées", "sum"),
-            jour_semaine=(COL_DATE, lambda x: x.iloc[0].weekday()),
-            jour=(COL_DATE, lambda x: x.iloc[0].day)
+            heures=("Heures_travaillées", "sum")
         )
     )
 
-    # --------------------------------------------------
-    # RÈGLES MÉTIER – STATUT DU POINTAGE
-    # --------------------------------------------------
+    daily["Jour"] = daily[COL_DATE].dt.day
+    daily["Jour_semaine"] = daily[COL_DATE].dt.weekday  # 0=lundi
+
+    # -------------------------------
+    # Règles métier exhaustivité
+    # -------------------------------
     def statut_pointage(h, wd):
         if wd >= 5:  # samedi / dimanche
             return "Weekend OK" if h == 0 else "Travail weekend"
@@ -127,100 +168,89 @@ def page_productivite():
         return "Surpointage"
 
     daily["Statut"] = daily.apply(
-        lambda r: statut_pointage(r["heures"], r["jour_semaine"]),
+        lambda r: statut_pointage(r["heures"], r["Jour_semaine"]),
         axis=1
     )
 
-    # --------------------------------------------------
-    # PIVOT (
-    # --------------------------------------------------
-    pivot = daily.pivot_table(
-        index="jour",
-        columns=COL_TECHNICIEN,
+    # -------------------------------
+    # Pivot sécurisé (pas d’erreur doublons)
+    # -------------------------------
+    pivot_statut = daily.pivot_table(
+        index=COL_TECHNICIEN,
+        columns="Jour",
         values="Statut",
         aggfunc="first"
     )
-        # --------------------------------------------------
-    # PIVOT DES HEURES (POUR ANNOTATION)
-    # --------------------------------------------------
+
     pivot_heures = daily.pivot_table(
-        index="jour",
-        columns=COL_TECHNICIEN,
+        index=COL_TECHNICIEN,
+        columns="Jour",
         values="heures",
         aggfunc="sum"
     )
 
-
-    # --------------------------------------------------
-    # MAPPING COULEURS
-    # --------------------------------------------------
-    colors = {
-        "Non conforme": "#d73027",     # rouge
-        "Incomplet": "#fee08b",        # jaune
-        "Conforme": "#1a9850",         # vert
-        "Surpointage": "#4575b4",      # bleu
-        "Weekend OK": "#f0f0f0",       # gris
-        "Travail weekend": "#984ea3"   # violet
+    # -------------------------------
+    # Mapping couleurs
+    # -------------------------------
+    color_map = {
+        "Non conforme": "#d73027",
+        "Incomplet": "#fee08b",
+        "Conforme": "#1a9850",
+        "Surpointage": "#4575b4",
+        "Weekend OK": "#f0f0f0",
+        "Travail weekend": "#984ea3"
     }
 
-    # --------------------------------------------------
-    # MATRICE RGB POUR IMAGESHOW
-    # --------------------------------------------------
-    rgb = np.zeros((pivot.shape[0], pivot.shape[1], 3), dtype=float)
+    # -------------------------------
+    # Construction matrice RGB
+    # -------------------------------
+    n_rows, n_cols = pivot_statut.shape
+    rgb = np.ones((n_rows, n_cols, 3))
 
-    for i in range(pivot.shape[0]):
-        for j in range(pivot.shape[1]):
-            statut = pivot.iloc[i, j]
-            couleur = colors.get(statut, "#ffffff")
+    for i in range(n_rows):
+        for j in range(n_cols):
+            statut = pivot_statut.iloc[i, j]
+            couleur = color_map.get(statut, "#ffffff")
             rgb[i, j, :] = mcolors.to_rgb(couleur)
 
-    # --------------------------------------------------
-    # VISUALISATION
-    # --------------------------------------------------
+    # -------------------------------
+    # Visualisation
+    # -------------------------------
     fig, ax = plt.subplots(
-        figsize=(max(8, pivot.shape[1] * 0.6), 6)
+        figsize=(max(10, n_cols * 0.5), max(6, n_rows * 0.35))
     )
 
     ax.imshow(rgb, aspect="auto")
 
-    # --------------------------------------------------
-    # ANNOTATION : HEURES DANS CHAQUE CASE
-    # --------------------------------------------------
-    for i in range(pivot.shape[0]):
-        for j in range(pivot.shape[1]):
+    ax.set_xticks(range(n_cols))
+    ax.set_xticklabels(pivot_statut.columns)
+    ax.set_yticks(range(n_rows))
+    ax.set_yticklabels(pivot_statut.index)
 
-            h = pivot_heures.iloc[i, j]
+    ax.set_xlabel("Jour du mois")
+    ax.set_ylabel("Techniciens")
+    ax.set_title(
+        f"Exhaustivité des pointages – {equipe_audit} ({mois_choisi})"
+    )
 
-            if pd.isna(h):
-                continue
-
-            # Couleur du texte (lisibilité)
-            text_color = "black" if h < 8 else "white"
-
-            ax.text(
-                j, i,
-                f"{h:.1f}",
-                ha="center",
-                va="center",
-                fontsize=9,
-                color=text_color
-            )
-
-
-    ax.set_xticks(range(pivot.shape[1]))
-    ax.set_xticklabels(pivot.columns, rotation=45, ha="right")
-
-    ax.set_yticks(range(pivot.shape[0]))
-    ax.set_yticklabels(pivot.index)
-
-    ax.set_xlabel("Techniciens")
-    ax.set_ylabel("Jour du mois")
-    ax.set_title(f"Exhaustivité des pointages – {equipe_audit}")
+    # -------------------------------
+    # Affichage heures dans les cases
+    # -------------------------------
+    for i in range(n_rows):
+        for j in range(n_cols):
+            val = pivot_heures.iloc[i, j]
+            if not pd.isna(val):
+                ax.text(
+                    j, i,
+                    f"{val:.1f}",
+                    ha="center",
+                    va="center",
+                    fontsize=8,
+                    color="black"
+                )
 
     st.pyplot(fig)
     st.divider()
-
-
     # ==================================================
     # PRODUCTIVITÉ PAR TECHNICIEN (BARPLOT)
     # ==================================================
