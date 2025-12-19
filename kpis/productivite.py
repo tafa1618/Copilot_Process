@@ -269,18 +269,11 @@ def page_productivite():
         prod_tech["heures_fact"] / prod_tech["heures_trav"]
     )
 
-    prod_tech = prod_tech.sort_values("Productivité", ascending=True)
+    prod_tech = prod_tech.sort_values("Productivité", ascending=False)
 
     st.bar_chart(
         prod_tech.set_index(COL_TECHNICIEN)["Productivité"]
     )
-
-    st.dataframe(
-        prod_tech.style.format({"Productivité": "{:.1%}"})
-    )
-
-
-    
 
     st.dataframe(
         prod_tech.style.format({"Productivité": "{:.1%}"})
