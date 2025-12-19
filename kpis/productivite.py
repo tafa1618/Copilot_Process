@@ -224,27 +224,7 @@ def page_productivite():
     # ==================================================
     # PRODUCTIVITÉ PAR TECHNICIEN (BARPLOT)
     # ==================================================
-    st.subheader("Productivité par technicien")
-
-    prod_tech = (
-        df.groupby(COL_TECHNICIEN)
-        .agg(
-            heures_trav=("Heures_travaillées", "sum"),
-            heures_fact=("Heures_facturables", "sum")
-        )
-        .reset_index()
-    )
-
-    prod_tech["Productivité"] = (
-        prod_tech["heures_fact"] / prod_tech["heures_trav"]
-    )
-
-    prod_tech = prod_tech.sort_values("Productivité", ascending=False)
-        # ==================================================
-    # PRODUCTIVITÉ PAR TECHNICIEN (STREAMLIT NATIF)
-    # ==================================================
-    st.subheader("Productivité par technicien")
-
+    st.subheader("Productivité par technicien") 
     prod_tech = (
         df.groupby(COL_TECHNICIEN)
         .agg(
