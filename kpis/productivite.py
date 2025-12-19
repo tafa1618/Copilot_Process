@@ -242,3 +242,115 @@ def page_productivite():
             "Productivité équipe": "{:.1%}"
         })
     )
+        # ==================================================
+    # CORRÉLATION DES ÉQUIPES AVEC LA PRODUCTIVITÉ GLOBALE
+    # ==================================================
+    st.header("📈 Tendances & corrélation des équipes avec la moyenne")
+
+    # --- Série globale mensuelle (référence) ---
+    global_ts = (
+        df.groupby("Mois")
+        .agg(
+            heures_trav=("Heures_travaillées", "sum"),
+            heures_fact=("Heures_facturables", "sum")
+        )
+        .reset_index()
+        .sort_values("Mois")
+    )
+
+    global_ts["Productivité globale"] = (
+        global_ts["heures_fact"] / global_ts["heures_trav"]
+    )
+
+    # --- Équipes analysées ---
+    equipes_corr = sorted(df[COL_EQUIPE].dropna().unique())
+
+    correlations = []
+
+    # Grille compacte (2 graphiques par ligne)
+    NB_COLS = 2
+    cols = st.columns(NB_COLS)
+
+    for i, equipe in enumerate(equipes_corr):
+        with cols[i % NB_COLS]:
+
+            df_eq = df[df[COL_EQUIPE] == equipe]
+
+            eq_ts = (
+                df_eq.groupby("Mois")
+                .agg(
+                    heures_trav=("Heures_travaillées", "sum"),
+                    heures_fact=("Heures_facturables", "sum")
+                )
+                .reset_index()
+                .sort_values("Mois")
+            )
+
+            eq_ts["Productivité équipe"] = (
+                eq_ts["heures_fact"] / eq_ts["heures_trav"]
+            )
+
+            # --- Fusion équipe vs global ---
+            merged = pd.merge(
+                global_ts[["Mois", "Productivité globale"]],
+                eq_ts[["Mois", "Productivité équipe"]],
+                on="Mois",
+                how="inner"
+            )
+
+            # --- Corrélation ---
+            corr = merged["Productivité globale"].corr(
+                merged["Productivité équipe"]
+            )
+
+            correlations.append({
+                "Équipe": equipe,
+                "Corrélation": corr
+            })
+
+            # --- Plot ---
+            fig, ax = plt.subplots(figsize=(4.5, 3))
+
+            sns.lineplot(
+                data=merged,
+                x="Mois",
+                y="Productivité globale",
+                label="Global",
+                ax=ax
+            )
+            sns.lineplot(
+                data=merged,
+                x="Mois",
+                y="Productivité équipe",
+                label=equipe,
+                ax=ax
+            )
+
+            ax.set_title(
+                f"{equipe}\nCorrélation = {corr:.2f}",
+                fontsize=10
+            )
+            ax.set_xlabel("")
+            ax.set_ylabel("Productivité")
+            ax.tick_params(axis="x", rotation=45)
+            ax.legend(fontsize=8)
+
+            st.pyplot(fig)
+
+    # ==================================================
+    # COMMENTAIRE AUTOMATIQUE – ÉQUIPE DRIVER
+    # ==================================================
+    if correlations:
+        corr_df = pd.DataFrame(correlations).dropna()
+        equipe_driver = corr_df.sort_values(
+            "Corrélation", ascending=False
+        ).iloc[0]
+
+        st.info(
+            f"📌 **Analyse d’influence**\n\n"
+            f"L’équipe **{equipe_driver['Équipe']}** présente la plus forte "
+            f"corrélation avec la productivité globale "
+            f"(corrélation = {equipe_driver['Corrélation']:.2f}).\n\n"
+            f"👉 Son évolution constitue un **bon proxy** de la tendance globale."
+        )
+
