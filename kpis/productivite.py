@@ -132,7 +132,7 @@ def page_productivite():
     )
 
     # --------------------------------------------------
-    # PIVOT (SÉCURISÉ)
+    # PIVOT (
     # --------------------------------------------------
     pivot = daily.pivot_table(
         index="jour",
@@ -140,6 +140,16 @@ def page_productivite():
         values="Statut",
         aggfunc="first"
     )
+        # --------------------------------------------------
+    # PIVOT DES HEURES (POUR ANNOTATION)
+    # --------------------------------------------------
+    pivot_heures = daily.pivot_table(
+        index="jour",
+        columns=COL_TECHNICIEN,
+        values="heures",
+        aggfunc="sum"
+    )
+
 
     # --------------------------------------------------
     # MAPPING COULEURS
@@ -171,7 +181,31 @@ def page_productivite():
         figsize=(max(8, pivot.shape[1] * 0.6), 6)
     )
 
-    ax.imshow(rgb, aspect="auto")
+        ax.imshow(rgb, aspect="auto")
+
+    # --------------------------------------------------
+    # ANNOTATION : HEURES DANS CHAQUE CASE
+    # --------------------------------------------------
+    for i in range(pivot.shape[0]):
+        for j in range(pivot.shape[1]):
+
+            h = pivot_heures.iloc[i, j]
+
+            if pd.isna(h):
+                continue
+
+            # Couleur du texte (lisibilité)
+            text_color = "black" if h < 8 else "white"
+
+            ax.text(
+                j, i,
+                f"{h:.1f}",
+                ha="center",
+                va="center",
+                fontsize=9,
+                color=text_color
+            )
+
 
     ax.set_xticks(range(pivot.shape[1]))
     ax.set_xticklabels(pivot.columns, rotation=45, ha="right")
