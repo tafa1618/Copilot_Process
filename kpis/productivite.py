@@ -240,20 +240,36 @@ def page_productivite():
     )
 
     prod_tech = prod_tech.sort_values("Productivité", ascending=False)
+        # ==================================================
+    # PRODUCTIVITÉ PAR TECHNICIEN (STREAMLIT NATIF)
+    # ==================================================
+    st.subheader("Productivité par technicien")
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    sns.barplot(
-        data=prod_tech,
-        x=COL_TECHNICIEN,
-        y="Productivité",
-        ax=ax
+    prod_tech = (
+        df.groupby(COL_TECHNICIEN)
+        .agg(
+            heures_trav=("Heures_travaillées", "sum"),
+            heures_fact=("Heures_facturables", "sum")
+        )
+        .reset_index()
     )
-    ax.set_title("Productivité par technicien")
-    ax.set_ylabel("Productivité")
-    ax.set_xlabel("")
-    ax.tick_params(axis="x", rotation=45)
 
-    st.pyplot(fig)
+    prod_tech["Productivité"] = (
+        prod_tech["heures_fact"] / prod_tech["heures_trav"]
+    )
+
+    prod_tech = prod_tech.sort_values("Productivité", ascending=False)
+
+    st.bar_chart(
+        prod_tech.set_index(COL_TECHNICIEN)["Productivité"]
+    )
+
+    st.dataframe(
+        prod_tech.style.format({"Productivité": "{:.1%}"})
+    )
+
+
+    
 
     st.dataframe(
         prod_tech.style.format({"Productivité": "{:.1%}"})
