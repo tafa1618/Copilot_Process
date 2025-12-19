@@ -84,6 +84,107 @@ def page_productivite():
     st.metric("Productivité", f"{prod_global:.1%}")
     st.divider()
 
+        # ==================================================
+    # 1️⃣ EXHAUSTIVITÉ DES POINTAGES – CALENDRIER
+    # ==================================================
+    st.header("🗓️ Exhaustivité des pointages")
+
+    equipe_audit = st.selectbox(
+        "Choisir une équipe à auditer",
+        options=sorted(df[COL_EQUIPE].dropna().unique()),
+        key="exhaustivite_equipe"
+    )
+
+    df_cal = df[df[COL_EQUIPE] == equipe_audit].copy()
+
+    # --------------------------------------------------
+    # AGRÉGATION : 1 ligne / jour / technicien
+    # --------------------------------------------------
+    daily = (
+        df_cal
+        .groupby([COL_DATE, COL_TECHNICIEN], as_index=False)
+        .agg(
+            heures=("Heures_travaillées", "sum"),
+            jour_semaine=(COL_DATE, lambda x: x.iloc[0].weekday()),
+            jour=(COL_DATE, lambda x: x.iloc[0].day)
+        )
+    )
+
+    # --------------------------------------------------
+    # RÈGLES MÉTIER – STATUT DU POINTAGE
+    # --------------------------------------------------
+    def statut_pointage(h, wd):
+        if wd >= 5:  # samedi / dimanche
+            return "Weekend OK" if h == 0 else "Travail weekend"
+        if h == 0:
+            return "Non conforme"
+        if h < 8:
+            return "Incomplet"
+        if h == 8:
+            return "Conforme"
+        return "Surpointage"
+
+    daily["Statut"] = daily.apply(
+        lambda r: statut_pointage(r["heures"], r["jour_semaine"]),
+        axis=1
+    )
+
+    # --------------------------------------------------
+    # PIVOT (SÉCURISÉ)
+    # --------------------------------------------------
+    pivot = daily.pivot_table(
+        index="jour",
+        columns=COL_TECHNICIEN,
+        values="Statut",
+        aggfunc="first"
+    )
+
+    # --------------------------------------------------
+    # MAPPING COULEURS
+    # --------------------------------------------------
+    colors = {
+        "Non conforme": "#d73027",     # rouge
+        "Incomplet": "#fee08b",        # jaune
+        "Conforme": "#1a9850",         # vert
+        "Surpointage": "#4575b4",      # bleu
+        "Weekend OK": "#f0f0f0",       # gris
+        "Travail weekend": "#984ea3"   # violet
+    }
+
+    # --------------------------------------------------
+    # MATRICE RGB POUR IMAGESHOW
+    # --------------------------------------------------
+    rgb = np.zeros((pivot.shape[0], pivot.shape[1], 3), dtype=float)
+
+    for i in range(pivot.shape[0]):
+        for j in range(pivot.shape[1]):
+            statut = pivot.iloc[i, j]
+            couleur = colors.get(statut, "#ffffff")
+            rgb[i, j, :] = mcolors.to_rgb(couleur)
+
+    # --------------------------------------------------
+    # VISUALISATION
+    # --------------------------------------------------
+    fig, ax = plt.subplots(
+        figsize=(max(8, pivot.shape[1] * 0.6), 6)
+    )
+
+    ax.imshow(rgb, aspect="auto")
+
+    ax.set_xticks(range(pivot.shape[1]))
+    ax.set_xticklabels(pivot.columns, rotation=45, ha="right")
+
+    ax.set_yticks(range(pivot.shape[0]))
+    ax.set_yticklabels(pivot.index)
+
+    ax.set_xlabel("Techniciens")
+    ax.set_ylabel("Jour du mois")
+    ax.set_title(f"Exhaustivité des pointages – {equipe_audit}")
+
+    st.pyplot(fig)
+    st.divider()
+
+
     # ==================================================
     # PRODUCTIVITÉ PAR TECHNICIEN (BARPLOT)
     # ==================================================
