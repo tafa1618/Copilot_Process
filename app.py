@@ -91,7 +91,11 @@ if st.session_state.page == "Accueil":
 
         if st.button("⚙️ Efficience"):
             st.session_state.page = "Efficience"
-
+        elif st.session_state.page == "Efficience":
+            page_efficience()
+            st.divider()
+        if st.button("⬅️ Retour à l’accueil"):
+            st.session_state.page = "Accueil"
     with nav2:
         if st.button("🔍 Inspection Rate"):
             st.session_state.page = "Inspection"
