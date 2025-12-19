@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 
 # ==================================================
@@ -31,23 +30,21 @@ def page_efficience():
     # --------------------------------------------------
     # HEADER
     # --------------------------------------------------
-    st.header("⚙️ Efficience des OR – Pilotage Méthode & Process")
+    st.header("⚙️ Efficience des OR – Méthode & Process")
 
     st.markdown(
         """
-        **Définition**  
-        L’efficience mesure l’écart entre le **temps consommé** et le
-        **temps vendu ou prévu** sur un Ordre de Réparation (OR).
+        **Efficience OR** = Temps consommé / Temps vendu (ou prévu).
 
-        👉 OR *en cours* = **actionnable**  
-        👉 OR *clôturé* = **historique**
+        - **EC** : OR en cours → **actionnable**
+        - **CP** : OR clôturé → **retour d’expérience**
         """
     )
 
     st.divider()
 
     # --------------------------------------------------
-    # UPLOAD FICHIERS
+    # UPLOAD DES FICHIERS
     # --------------------------------------------------
     col1, col2, col3 = st.columns(3)
 
@@ -84,7 +81,7 @@ def page_efficience():
     df_ie = pd.read_excel(file_ie)
 
     # --------------------------------------------------
-    # DÉTECTION & NORMALISATION OR
+    # NORMALISATION CLÉ OR
     # --------------------------------------------------
     col_or_bo = detect_or_column(df_bo)
     col_or_pt = detect_or_column(df_pt)
@@ -103,13 +100,13 @@ def page_efficience():
     # --------------------------------------------------
     COL_EQUIPE = "Salarié - Equipe(Nom)"
     COL_TECH = "Salarié - Nom"
+    COL_HEURES = "Hr_travaillée"
 
     COL_TEMPS_VENDU = "Temps vendu (OR)"
     COL_TEMPS_PREVU = "Temps prévu devis (OR)"
     COL_TEMPS_CONSO = "Durée pointage agents productifs (OR)"
 
-    COL_STATUT = "Position"
-    COL_TYPE_OR = "Type OR"
+    COL_STATUT = "Position"   # EC / CP
 
     # --------------------------------------------------
     # PRÉPARATION BO
@@ -124,12 +121,33 @@ def page_efficience():
     df_bo = df_bo[df_bo["Temps_reference"] > 0]
 
     # --------------------------------------------------
-    # MERGE BO + IE
+    # RATTACHEMENT OR → ÉQUIPE / TECHNICIEN (POINTAGE)
     # --------------------------------------------------
-    df = df_bo.merge(
-        df_ie[["OR_ID", COL_STATUT]],
-        on="OR_ID",
-        how="left"
+    df_pt[COL_HEURES] = pd.to_numeric(
+        df_pt[COL_HEURES], errors="coerce"
+    ).fillna(0)
+
+    rattachement = (
+        df_pt
+        .groupby(["OR_ID", COL_EQUIPE, COL_TECH], as_index=False)
+        .agg(heures=("Hr_travaillée", "sum"))
+    )
+
+    # On garde l’équipe / technicien dominant par OR
+    rattachement = (
+        rattachement
+        .sort_values("heures", ascending=False)
+        .drop_duplicates("OR_ID")
+        [["OR_ID", COL_EQUIPE, COL_TECH]]
+    )
+
+    # --------------------------------------------------
+    # MERGE FINAL BO + IE + POINTAGE
+    # --------------------------------------------------
+    df = (
+        df_bo
+        .merge(df_ie[["OR_ID", COL_STATUT]], on="OR_ID", how="left")
+        .merge(rattachement, on="OR_ID", how="left")
     )
 
     # --------------------------------------------------
@@ -211,10 +229,13 @@ def page_efficience():
     st.subheader("🚨 OR en cours – dérives actionnables")
 
     equipes = sorted(df[COL_EQUIPE].dropna().unique())
-    equipe_sel = st.selectbox("Filtrer par équipe", options=equipes)
+    equipe_sel = st.selectbox(
+        "Filtrer par équipe",
+        options=equipes
+    )
 
     encours = df[
-        (df[COL_STATUT] != "Clôturé") &
+        (df[COL_STATUT] == "EC") &
         (df[COL_EQUIPE] == equipe_sel) &
         (df["Efficience"] > 1)
     ]
@@ -224,7 +245,7 @@ def page_efficience():
             [
                 "OR_ID",
                 COL_EQUIPE,
-                COL_TYPE_OR,
+                COL_TECH,
                 "Temps_reference",
                 COL_TEMPS_CONSO,
                 "Efficience",
@@ -234,5 +255,3 @@ def page_efficience():
         .sort_values("Efficience", ascending=False)
         .style.format({"Efficience": "{:.1%}"})
     )
-
-
