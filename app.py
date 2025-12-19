@@ -120,9 +120,9 @@ elif st.session_state.page == "Productivité":
 # PAGE Efficience
 # ===============================
  elif st.session_state.page == "Efficience":
-     page_efficience()
-     st.divider()
-     if st.button("⬅️ Retour à l’accueil"):
+      page_efficience()
+      st.divider()
+      if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
 
 # ===============================
