@@ -137,30 +137,40 @@ def page_productivite():
     color_matrix = pivot.applymap(lambda x: colors.get(x, "#ffffff"))
 
     # --------------------------------------------------
-    # VISUALISATION
     # --------------------------------------------------
-    fig, ax = plt.subplots(
-        figsize=(max(8, len(pivot.columns) * 0.6), 6)
-    )
+# VISUALISATION (CORRIGÉE)
+# --------------------------------------------------
+# Construction matrice RGB (float)
+rgb_array = np.zeros(
+    (pivot.shape[0], pivot.shape[1], 3),
+    dtype=float
+)
 
-    ax.imshow(
-        color_matrix.applymap(lambda c: list(mcolors.to_rgb(c))).values,
-        aspect="auto"
-    )
+for i in range(pivot.shape[0]):
+    for j in range(pivot.shape[1]):
+        statut = pivot.iloc[i, j]
+        couleur = colors.get(statut, "#ffffff")
+        rgb_array[i, j, :] = mcolors.to_rgb(couleur)
 
-    ax.set_xticks(range(len(pivot.columns)))
-    ax.set_xticklabels(pivot.columns, rotation=45, ha="right")
+fig, ax = plt.subplots(
+    figsize=(max(8, pivot.shape[1] * 0.6), 6)
+)
 
-    ax.set_yticks(range(len(pivot.index)))
-    ax.set_yticklabels(pivot.index)
+ax.imshow(rgb_array, aspect="auto")
 
-    ax.set_xlabel("Techniciens")
-    ax.set_ylabel("Jour du mois")
-    ax.set_title(f"Exhaustivité des pointages – {equipe_audit}")
+ax.set_xticks(range(pivot.shape[1]))
+ax.set_xticklabels(pivot.columns, rotation=45, ha="right")
 
-    st.pyplot(fig)
-    st.divider()
+ax.set_yticks(range(pivot.shape[0]))
+ax.set_yticklabels(pivot.index)
 
+ax.set_xlabel("Techniciens")
+ax.set_ylabel("Jour du mois")
+ax.set_title(f"Exhaustivité des pointages – {equipe_audit}")
+
+st.pyplot(fig)
+
+       
     # ===============================
     # 2️⃣ PRODUCTIVITÉ GLOBALE
     # ===============================
