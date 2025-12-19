@@ -7,6 +7,10 @@ import matplotlib.colors as mcolors
 
 
 
+@st.cache_data(show_spinner="Chargement des pointages...")
+def load_pointages(file):
+    return pd.read_excel(file)
+
 def page_productivite():
     # ==================================================
     # STYLE GRAPHIQUE
@@ -31,8 +35,7 @@ def page_productivite():
         st.info("Veuillez charger le fichier de pointages.")
         return
 
-    df = pd.read_excel(uploaded_file)
-
+    df = load_pointages(uploaded_file)
     st.subheader("Aperçu des données")
     st.dataframe(df.head())
     st.divider()
