@@ -67,8 +67,10 @@ def page_productivite():
     df["Mois"] = df[COL_DATE].dt.to_period("M").astype(str)
 
     # ===============================
-    # 1️⃣ EXHAUSTIVITÉ
-    # ===============================
+  # ==================================================
+        # ==================================================
+    # 1️⃣ EXHAUSTIVITÉ DES POINTAGES – CALENDRIER
+    # ==================================================
     st.header("🗓️ Exhaustivité des pointages")
 
     equipe_audit = st.selectbox(
@@ -76,20 +78,26 @@ def page_productivite():
         options=sorted(df[COL_EQUIPE].dropna().unique())
     )
 
-    df_cal = df[df[COL_EQUIPE] == equipe_audit]
+    df_cal = df[df[COL_EQUIPE] == equipe_audit].copy()
 
+    # --------------------------------------------------
+    # AGRÉGATION : 1 ligne / jour / technicien
+    # --------------------------------------------------
     daily = (
         df_cal
-        .groupby([COL_DATE, COL_TECH])
-        .agg(heures=("Heures_trav", "sum"))
-        .reset_index()
+        .groupby([COL_DATE, COL_TECH], as_index=False)
+        .agg(
+            heures=("Heures_trav", "sum"),
+            jour_semaine=(COL_DATE, lambda x: x.iloc[0].weekday()),
+            jour=(COL_DATE, lambda x: x.iloc[0].day)
+        )
     )
 
-    daily["Jour"] = daily[COL_DATE].dt.day
-    daily["Jour_semaine"] = daily[COL_DATE].dt.weekday
-
-    def statut(h, wd):
-        if wd >= 5:
+    # --------------------------------------------------
+    # STATUT MÉTIER
+    # --------------------------------------------------
+    def statut_pointage(h, wd):
+        if wd >= 5:  # Samedi / Dimanche
             return "Weekend OK" if h == 0 else "Travail weekend"
         if h == 0:
             return "Non conforme"
@@ -100,16 +108,23 @@ def page_productivite():
         return "Surpointage"
 
     daily["Statut"] = daily.apply(
-        lambda r: statut(r["heures"], r["Jour_semaine"]),
+        lambda r: statut_pointage(r["heures"], r["jour_semaine"]),
         axis=1
     )
 
-    pivot = daily.pivot(
-        index="Jour",
+    # --------------------------------------------------
+    # PIVOT SÉCURISÉ
+    # --------------------------------------------------
+    pivot = daily.pivot_table(
+        index="jour",
         columns=COL_TECH,
-        values="Statut"
+        values="Statut",
+        aggfunc="first"
     )
 
+    # --------------------------------------------------
+    # COULEURS
+    # --------------------------------------------------
     colors = {
         "Non conforme": "#d73027",
         "Incomplet": "#fee08b",
@@ -121,7 +136,13 @@ def page_productivite():
 
     color_matrix = pivot.applymap(lambda x: colors.get(x, "#ffffff"))
 
-    fig, ax = plt.subplots(figsize=(max(8, len(pivot.columns)*0.6), 6))
+    # --------------------------------------------------
+    # VISUALISATION
+    # --------------------------------------------------
+    fig, ax = plt.subplots(
+        figsize=(max(8, len(pivot.columns) * 0.6), 6)
+    )
+
     ax.imshow(
         color_matrix.applymap(lambda c: list(mcolors.to_rgb(c))).values,
         aspect="auto"
@@ -129,11 +150,13 @@ def page_productivite():
 
     ax.set_xticks(range(len(pivot.columns)))
     ax.set_xticklabels(pivot.columns, rotation=45, ha="right")
+
     ax.set_yticks(range(len(pivot.index)))
     ax.set_yticklabels(pivot.index)
-    ax.set_title(f"Exhaustivité – {equipe_audit}")
+
     ax.set_xlabel("Techniciens")
     ax.set_ylabel("Jour du mois")
+    ax.set_title(f"Exhaustivité des pointages – {equipe_audit}")
 
     st.pyplot(fig)
     st.divider()
