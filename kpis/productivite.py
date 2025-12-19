@@ -1,22 +1,28 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 
 
 def page_productivite():
+    # ==================================================
+    # STYLE GRAPHIQUE
+    # ==================================================
     sns.set_theme(style="whitegrid")
 
-    st.header("📊 Productivité & Exhaustivité – Pointages")
+    # ==================================================
+    # HEADER
+    # ==================================================
+    st.header("📊 Productivité – Pointages (Neemba Sénégal)")
 
-    # ===============================
+    # ==================================================
     # UPLOAD
-    # ===============================
+    # ==================================================
     uploaded_file = st.file_uploader(
         "Charger le fichier de pointages (Excel)",
         type=["xlsx"],
-        key="pointages_upload"
+        key="productivite_pointages"
     )
 
     if not uploaded_file:
@@ -29,71 +35,65 @@ def page_productivite():
     st.dataframe(df.head())
     st.divider()
 
-    # ===============================
-    # COLONNES
-    # ===============================
-    COL_TECH = "Salarié - Nom"
+    # ==================================================
+    # CONSTANTES COLONNES
+    # ==================================================
+    COL_TECHNICIEN = "Salarié - Nom"
     COL_EQUIPE = "Salarié - Equipe(Nom)"
+    COL_FACTURABLE = "Facturable"
     COL_HEURES = "Hr_travaillée"
-    COL_FACT = "Facturable"
     COL_DATE = "Saisie heures - Date"
 
-    # ===============================
-    # FILTRE ÉQUIPE
-    # ===============================
-    equipes = sorted(df[COL_EQUIPE].dropna().unique())
-    equipes_sel = st.multiselect(
-        "Filtrer par équipe",
-        options=equipes,
-        default=equipes
+    # ==================================================
+    # FILTRE GLOBAL PAR ÉQUIPE
+    # ==================================================
+    st.subheader("Filtrer par équipe")
+
+    equipes_disponibles = sorted(df[COL_EQUIPE].dropna().unique())
+    equipes_selectionnees = st.multiselect(
+        "Choisir les équipes à analyser",
+        options=equipes_disponibles,
+        default=equipes_disponibles,
+        key="productivite_equipes"
     )
 
-    if equipes_sel:
-        df = df[df[COL_EQUIPE].isin(equipes_sel)]
+    if equipes_selectionnees:
+        df = df[df[COL_EQUIPE].isin(equipes_selectionnees)]
 
     st.divider()
 
-    # ===============================
-    # PRÉPARATION
-    # ===============================
-    df[COL_HEURES] = pd.to_numeric(df[COL_HEURES], errors="coerce").fillna(0)
-    df[COL_FACT] = pd.to_numeric(df[COL_FACT], errors="coerce").fillna(0)
+    # ==================================================
+    # PRÉPARATION DONNÉES
+    # ==================================================
+    df[COL_HEURES] = pd.to_numeric(df[COL_HEURES], errors="coerce")
+    df[COL_FACTURABLE] = pd.to_numeric(df[COL_FACTURABLE], errors="coerce").fillna(0)
     df[COL_DATE] = pd.to_datetime(df[COL_DATE], errors="coerce")
 
-    df["Heures_trav"] = df[COL_HEURES]
-    df["Heures_fact"] = df[COL_FACT]
-    df["Jour"] = df[COL_DATE].dt.day
-    df["Jour_semaine"] = df[COL_DATE].dt.weekday
+    df["Heures_travaillées"] = df[COL_HEURES]
+    df["Heures_facturables"] = df[COL_FACTURABLE]
     df["Mois"] = df[COL_DATE].dt.to_period("M").astype(str)
 
-    # ===============================
-  # ==================================================
-      
-
-       
-    # ===============================
-    # 2️⃣ PRODUCTIVITÉ GLOBALE
-    # ===============================
-    total_trav = df["Heures_trav"].sum()
-    total_fact = df["Heures_fact"].sum()
-    prod_globale = total_fact / total_trav if total_trav > 0 else 0
-
-    # 🔗 Stockage pour l’accueil
-    st.session_state.productivite_globale = prod_globale
-    st.session_state.productivite_calculee = True
+    # ==================================================
+    # KPI GLOBAL
+    # ==================================================
+    total_trav = df["Heures_travaillées"].sum()
+    total_fact = df["Heures_facturables"].sum()
+    prod_global = total_fact / total_trav if total_trav > 0 else 0
 
     st.subheader("Productivité globale")
-    st.metric("Productivité", f"{prod_globale:.1%}")
+    st.metric("Productivité", f"{prod_global:.1%}")
     st.divider()
 
-    # ===============================
-    # PRODUCTIVITÉ PAR TECHNICIEN
-    # ===============================
+    # ==================================================
+    # PRODUCTIVITÉ PAR TECHNICIEN (BARPLOT)
+    # ==================================================
+    st.subheader("Productivité par technicien")
+
     prod_tech = (
-        df.groupby(COL_TECH)
+        df.groupby(COL_TECHNICIEN)
         .agg(
-            heures_trav=("Heures_trav", "sum"),
-            heures_fact=("Heures_fact", "sum")
+            heures_trav=("Heures_travaillées", "sum"),
+            heures_fact=("Heures_facturables", "sum")
         )
         .reset_index()
     )
@@ -102,15 +102,143 @@ def page_productivite():
         prod_tech["heures_fact"] / prod_tech["heures_trav"]
     )
 
+    prod_tech = prod_tech.sort_values("Productivité", ascending=False)
+
     fig, ax = plt.subplots(figsize=(10, 5))
     sns.barplot(
-        data=prod_tech.sort_values("Productivité", ascending=False),
-        x=COL_TECH,
+        data=prod_tech,
+        x=COL_TECHNICIEN,
         y="Productivité",
         ax=ax
     )
     ax.set_title("Productivité par technicien")
+    ax.set_ylabel("Productivité")
+    ax.set_xlabel("")
     ax.tick_params(axis="x", rotation=45)
 
     st.pyplot(fig)
-    st.dataframe(prod_tech.style.format({"Productivité": "{:.1%}"}))
+
+    st.dataframe(
+        prod_tech.style.format({"Productivité": "{:.1%}"})
+    )
+
+    st.divider()
+
+    # ==================================================
+    # TIMELINE GLOBALE (LINEPLOT)
+    # ==================================================
+    st.subheader("Évolution mensuelle – Global")
+
+    prod_mois_global = (
+        df.groupby("Mois")
+        .agg(
+            heures_trav=("Heures_travaillées", "sum"),
+            heures_fact=("Heures_facturables", "sum")
+        )
+        .reset_index()
+        .sort_values("Mois")
+    )
+
+    prod_mois_global["Productivité globale"] = (
+        prod_mois_global["heures_fact"] / prod_mois_global["heures_trav"]
+    )
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    sns.lineplot(
+        data=prod_mois_global,
+        x="Mois",
+        y="Productivité globale",
+        marker="o",
+        ax=ax
+    )
+
+    ax.set_title("Évolution mensuelle de la productivité globale")
+    ax.set_ylabel("Productivité")
+    ax.set_xlabel("Mois")
+    ax.tick_params(axis="x", rotation=45)
+
+    st.pyplot(fig)
+
+    st.dataframe(
+        prod_mois_global.style.format({"Productivité globale": "{:.1%}"})
+    )
+
+    st.divider()
+
+    # ==================================================
+    # ANALYSE FOCALISÉE – UNE ÉQUIPE
+    # ==================================================
+    st.header("Analyse détaillée d’une équipe")
+
+    equipe_choisie = st.selectbox(
+        "Choisir une équipe",
+        options=sorted(df[COL_EQUIPE].dropna().unique()),
+        key="productivite_focus_equipe"
+    )
+
+    df_eq = df[df[COL_EQUIPE] == equipe_choisie]
+
+    heures_trav_eq = df_eq["Heures_travaillées"].sum()
+    heures_fact_eq = df_eq["Heures_facturables"].sum()
+    prod_eq = heures_fact_eq / heures_trav_eq if heures_trav_eq > 0 else 0
+
+    st.metric(
+        f"Productivité – {equipe_choisie}",
+        f"{prod_eq:.1%}"
+    )
+
+    # ==================================================
+    # COMPARAISON TIMELINE – ÉQUIPE vs GLOBAL
+    # ==================================================
+    prod_mois_eq = (
+        df_eq.groupby("Mois")
+        .agg(
+            heures_trav=("Heures_travaillées", "sum"),
+            heures_fact=("Heures_facturables", "sum")
+        )
+        .reset_index()
+    )
+
+    prod_mois_eq["Productivité équipe"] = (
+        prod_mois_eq["heures_fact"] / prod_mois_eq["heures_trav"]
+    )
+
+    comparaison = pd.merge(
+        prod_mois_global[["Mois", "Productivité globale"]],
+        prod_mois_eq[["Mois", "Productivité équipe"]],
+        on="Mois",
+        how="inner"
+    ).sort_values("Mois")
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    sns.lineplot(
+        data=comparaison,
+        x="Mois",
+        y="Productivité globale",
+        label="Global",
+        ax=ax
+    )
+    sns.lineplot(
+        data=comparaison,
+        x="Mois",
+        y="Productivité équipe",
+        label=equipe_choisie,
+        ax=ax
+    )
+
+    ax.set_title(
+        f"Comparaison de tendance – {equipe_choisie} vs Global"
+    )
+    ax.set_ylabel("Productivité")
+    ax.set_xlabel("Mois")
+    ax.tick_params(axis="x", rotation=45)
+    ax.legend()
+
+    st.pyplot(fig)
+
+    st.dataframe(
+        comparaison.style.format({
+            "Productivité globale": "{:.1%}",
+            "Productivité équipe": "{:.1%}"
+        })
+    )
