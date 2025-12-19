@@ -1,7 +1,9 @@
 import streamlit as st
 from datetime import date
 
-# Import pages KPI
+# ===============================
+# IMPORT PAGES KPI
+# ===============================
 from kpis.productivite import page_productivite
 from kpis.efficience import page_efficience
 
@@ -26,12 +28,14 @@ if "productivite_globale" not in st.session_state:
 if "productivite_calculee" not in st.session_state:
     st.session_state.productivite_calculee = False
 
+
 # ===============================
 # HEADER GLOBAL
 # ===============================
 st.title("🧭 Copilote – Méthode & Process | Neemba Sénégal")
 st.caption(f"Situation des KPI YTD – au {date.today().strftime('%d/%m/%Y')}")
 st.divider()
+
 
 # ===============================
 # PAGE ACCUEIL
@@ -42,7 +46,7 @@ if st.session_state.page == "Accueil":
 
     st.markdown(
         """
-        Vue synthétique et opérationnelle de l’état des **KPI Méthode & Process**.
+        Vue synthétique et opérationnelle de l’état des **KPI Méthode & Process**.  
         Les indicateurs se mettent à jour automatiquement dès que les données
         sont chargées dans les modules dédiés.
         """
@@ -93,6 +97,7 @@ if st.session_state.page == "Accueil":
 
         if st.button("⚙️ Efficience"):
             st.session_state.page = "Efficience"
+
     with nav2:
         if st.button("🔍 Inspection Rate"):
             st.session_state.page = "Inspection"
@@ -107,6 +112,7 @@ if st.session_state.page == "Accueil":
         if st.button("🧪 PIP"):
             st.session_state.page = "PIP"
 
+
 # ===============================
 # PAGE PRODUCTIVITÉ
 # ===============================
@@ -117,23 +123,23 @@ elif st.session_state.page == "Productivité":
     st.divider()
     if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
-# PAGE Efficience
+
+
 # ===============================
- elif st.session_state.page == "Efficience":
-      page_efficience()
-      st.divider()
-      if st.button("⬅️ Retour à l’accueil"):
+# PAGE EFFICIENCE
+# ===============================
+elif st.session_state.page == "Efficience":
+
+    page_efficience()
+
+    st.divider()
+    if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
+
 
 # ===============================
 # AUTRES PAGES (PLACEHOLDERS)
 # ===============================
-elif st.session_state.page == "Efficience":
-    st.header("⚙️ Efficience OR")
-    st.info("Page à implémenter")
-    if st.button("⬅️ Retour à l’accueil"):
-        st.session_state.page = "Accueil"
-
 elif st.session_state.page == "Inspection":
     st.header("🔍 Inspection Rate")
     st.info("Page à implémenter")
@@ -157,3 +163,4 @@ elif st.session_state.page == "PIP":
     st.info("Page à implémenter")
     if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
+
