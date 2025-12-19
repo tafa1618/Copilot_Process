@@ -181,7 +181,7 @@ def page_productivite():
         figsize=(max(8, pivot.shape[1] * 0.6), 6)
     )
 
-        ax.imshow(rgb, aspect="auto")
+    ax.imshow(rgb, aspect="auto")
 
     # --------------------------------------------------
     # ANNOTATION : HEURES DANS CHAQUE CASE
