@@ -3,6 +3,8 @@ from datetime import date
 
 # Import pages KPI
 from kpis.productivite import page_productivite
+from kpis.efficience import page_efficience
+
 
 # ===============================
 # CONFIG
@@ -91,11 +93,6 @@ if st.session_state.page == "Accueil":
 
         if st.button("⚙️ Efficience"):
             st.session_state.page = "Efficience"
-        elif st.session_state.page == "Efficience":
-            page_efficience()
-            st.divider()
-        if st.button("⬅️ Retour à l’accueil"):
-            st.session_state.page = "Accueil"
     with nav2:
         if st.button("🔍 Inspection Rate"):
             st.session_state.page = "Inspection"
@@ -119,6 +116,13 @@ elif st.session_state.page == "Productivité":
 
     st.divider()
     if st.button("⬅️ Retour à l’accueil"):
+        st.session_state.page = "Accueil"
+# PAGE Efficience
+# ===============================
+ elif st.session_state.page == "Efficience":
+     page_efficience()
+     st.divider()
+     if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
 
 # ===============================
