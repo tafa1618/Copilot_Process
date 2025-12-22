@@ -1,28 +1,27 @@
 def page_efficience():
 
-    st.header("⚙️ Efficience des OR – Analyse opérationnelle")
+    st.header("⚙️ Efficience des OR – Pilotage opérationnel")
 
     st.warning(
         "⚠️ **Lecture indicative**\n\n"
-        "Les indicateurs d’efficience sont calculés à partir de plusieurs sources "
-        "(BO, IE, Pointages). Des écarts peuvent exister.\n\n"
-        "👉 Outil de **pilotage et d’aide à la décision**, "
-        "pas d’évaluation individuelle contractuelle."
+        "Les indicateurs d’efficience sont issus d’un rapprochement multi-sources "
+        "(ERP, BO, Pointages) consolidé via Power Query.\n\n"
+        "👉 Outil de **pilotage et de coaching**, pas d’évaluation contractuelle."
     )
 
     st.divider()
 
     # ===============================
-    # UPLOAD
+    # UPLOAD UNIQUE
     # ===============================
     uploaded_file = st.file_uploader(
-        "Charger le fichier d’efficience consolidée (Excel)",
+        "Charger le fichier Efficience consolidée (Power Query)",
         type=["xlsx"],
         key="efficience_upload"
     )
 
     if not uploaded_file:
-        st.info("Veuillez charger le fichier d’efficience.")
+        st.info("Veuillez charger le fichier d’efficience consolidée.")
         return
 
     df = pd.read_excel(uploaded_file)
@@ -40,7 +39,7 @@ def page_efficience():
 
     with col2:
         positions = sorted(df["Position"].dropna().unique())
-        position_sel = st.multiselect("Position OR", positions, default=positions)
+        position_sel = st.multiselect("Statut OR", positions, default=positions)
 
     with col3:
         types_or = sorted(df["Type OR"].dropna().unique())
@@ -48,6 +47,7 @@ def page_efficience():
 
     # Application filtres
     df_f = df.copy()
+
     if equipe_sel:
         df_f = df_f[df_f["Equipe"].isin(equipe_sel)]
     if position_sel:
@@ -93,7 +93,7 @@ def page_efficience():
     # ===============================
     # ENCOURS ACTIONNABLE
     # ===============================
-    st.subheader("🎯 OR encours – Priorités d’action")
+    st.subheader("🎯 OR encours – Actions prioritaires")
 
     encours = df_eff[df_eff["Position"] == "EC"]
 
@@ -109,5 +109,7 @@ def page_efficience():
                 "Efficience_OR",
                 "Planifié ?"
             ]
-        ].sort_values("Efficience_OR")
+        ]
+        .sort_values("Efficience_OR")
+        .style.format({"Efficience_OR": "{:.2f}"})
     )
