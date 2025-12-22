@@ -1,3 +1,6 @@
+import streamlit as st
+import pandas as pd
+
 def page_efficience():
 
     st.header("⚙️ Efficience des OR – Pilotage opérationnel")
