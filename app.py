@@ -54,7 +54,7 @@ if page == "Accueil":
 
     st.markdown(
         """
-        Vue synthétique et opérationnelle de l’état des **KPI Méthode & Process**.  
+        Vue  et opérationnelle de l’état des **KPI Méthode & Process**.  
         Les indicateurs se mettent à jour automatiquement dès que les données
         sont chargées dans les modules dédiés.
         """
