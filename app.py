@@ -6,15 +6,17 @@ from datetime import date
 # ===============================
 from kpis.productivite import page_productivite
 from kpis.efficience import page_efficience
+from kpis.llti import page_llti
 
 
 # ===============================
-# CONFIG
+# CONFIG STREAMLIT
 # ===============================
 st.set_page_config(
     page_title="Copilote Méthode & Process – Neemba Sénégal",
     layout="wide"
 )
+
 
 # ===============================
 # INIT SESSION STATE
@@ -37,10 +39,16 @@ st.caption(f"Situation des KPI YTD – au {date.today().strftime('%d/%m/%Y')}")
 st.divider()
 
 
+# ==================================================
+# ROUTING PRINCIPAL
+# ==================================================
+page = st.session_state.page
+
+
 # ===============================
 # PAGE ACCUEIL
 # ===============================
-if st.session_state.page == "Accueil":
+if page == "Accueil":
 
     st.subheader("👋 Bienvenue dans le Copilote Méthode & Process")
 
@@ -99,24 +107,24 @@ if st.session_state.page == "Accueil":
             st.session_state.page = "Efficience"
 
     with nav2:
+        if st.button("💰 LLTI"):
+            st.session_state.page = "LLTI"
+
         if st.button("🔍 Inspection Rate"):
             st.session_state.page = "Inspection"
 
+    with nav3:
         if st.button("📦 CVA Fulfillment"):
             st.session_state.page = "CVA"
 
-    with nav3:
         if st.button("🛠️ Service Response"):
             st.session_state.page = "Service"
-
-        if st.button("🧪 PIP"):
-            st.session_state.page = "PIP"
 
 
 # ===============================
 # PAGE PRODUCTIVITÉ
 # ===============================
-elif st.session_state.page == "Productivité":
+elif page == "Productivité":
 
     page_productivite()
 
@@ -128,7 +136,7 @@ elif st.session_state.page == "Productivité":
 # ===============================
 # PAGE EFFICIENCE
 # ===============================
-elif st.session_state.page == "Efficience":
+elif page == "Efficience":
 
     page_efficience()
 
@@ -138,29 +146,40 @@ elif st.session_state.page == "Efficience":
 
 
 # ===============================
+# PAGE LLTI
+# ===============================
+elif page == "LLTI":
+
+    page_llti()
+
+    st.divider()
+    if st.button("⬅️ Retour à l’accueil"):
+        st.session_state.page = "Accueil"
+
+
+# ===============================
 # AUTRES PAGES (PLACEHOLDERS)
 # ===============================
-elif st.session_state.page == "Inspection":
+elif page == "Inspection":
     st.header("🔍 Inspection Rate")
     st.info("Page à implémenter")
     if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
 
-elif st.session_state.page == "CVA":
+elif page == "CVA":
     st.header("📦 CVA Fulfillment")
     st.info("Page à implémenter")
     if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
 
-elif st.session_state.page == "Service":
+elif page == "Service":
     st.header("🛠️ Service Response")
     st.info("Page à implémenter")
     if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
 
-elif st.session_state.page == "PIP":
+elif page == "PIP":
     st.header("🧪 PIP")
     st.info("Page à implémenter")
     if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
-
