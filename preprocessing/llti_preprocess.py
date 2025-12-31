@@ -1,86 +1,53 @@
-# preprocessing/llti_preprocessing.py
-
 import pandas as pd
-from datetime import datetime
 
+def preprocess_llti(df_bo: pd.DataFrame) -> pd.DataFrame:
+    df = df_bo.copy()
 
-# ======================================================
-# 1️⃣ CHARGEMENT
-# ======================================================
-def load_bo_file(file) -> pd.DataFrame:
-    """
-    Accepte chemin local ou UploadFile / buffer
-    """
-    if isinstance(file, str):
-        return pd.read_excel(file)
-    return pd.read_excel(file)
-
-
-# ======================================================
-# 2️⃣ FILTRE TRIMESTRE COURANT
-# ======================================================
-def filter_current_quarter(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
-
+    # ===============================
+    # TYPAGE DES DATES
+    # ===============================
     df["Date Facture (Lignes)"] = pd.to_datetime(
         df["Date Facture (Lignes)"], errors="coerce"
     )
+    df["Pointage dernière date (Segment)"] = pd.to_datetime(
+        df["Pointage dernière date (Segment)"], errors="coerce"
+    )
 
-    today = datetime.today()
-    current_quarter = (today.month - 1) // 3 + 1
-    current_year = today.year
-
+    # ===============================
+    # FILTRAGE MINIMUM VIABLE
+    # ===============================
     df = df[
-        (df["Date Facture (Lignes)"].dt.year == current_year)
-        & (df["Date Facture (Lignes)"].dt.quarter == current_quarter)
+        df["N° Facture (Lignes)"].notna()
+        & df["Date Facture (Lignes)"].notna()
+        & df["Pointage dernière date (Segment)"].notna()
     ]
 
-    return df
+    # ===============================
+    # AGRÉGATION PAR FACTURE (CLÉ)
+    # ===============================
+    df_facture = (
+        df
+        .groupby("N° Facture (Lignes)", as_index=False)
+        .agg({
+            "Date Facture (Lignes)": "max",
+            "Pointage dernière date (Segment)": "max",
+            "N° OR (Segment)": "first",
+            "Nom Client OR (or)": "first",
+            "Numéro série Equipement (Segment)": "first"
+        })
+    )
 
+    # ===============================
+    # CALCUL LLTI
+    # ===============================
+    df_facture["LLTI_jours"] = (
+        df_facture["Date Facture (Lignes)"]
+        - df_facture["Pointage dernière date (Segment)"]
+    ).dt.days
 
-# ======================================================
-# 3️⃣ FILTRE OR AVEC POINTAGE
-# ======================================================
-def filter_or_with_pointage(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
+    # ===============================
+    # NETTOYAGE FINAL
+    # ===============================
+    df_facture = df_facture[df_facture["LLTI_jours"] >= 0]
 
-    df = df[
-        df["Pointage dernière date (Segment)"].notna()
-    ]
-
-    return df
-
-
-# ======================================================
-# 4️⃣ SÉLECTION COLONNES LLTI
-# ======================================================
-def select_llti_columns(df: pd.DataFrame) -> pd.DataFrame:
-    columns = [
-        "N° OR (Segment)",
-        "N° Facture (Lignes)",
-        "Date Facture (Lignes)",
-        "Pointage dernière date (Segment)",
-        "Nom Client OR (or)",
-        "Numéro série Equipement (Segment)",
-    ]
-
-    return df[columns].copy()
-
-
-# ======================================================
-# 5️⃣ PIPELINE COMPLET LLTI
-# ======================================================
-def preprocess_llti(file) -> pd.DataFrame:
-    """
-    Pipeline LLTI :
-    BO → Trimestre courant → OR pointés → Facture par facture
-    """
-    df = load_bo_file(file)
-    df = filter_current_quarter(df)
-    df = filter_or_with_pointage(df)
-    df = select_llti_columns(df)
-
-    # Nettoyage final
-    df = df.dropna(subset=["N° Facture (Lignes)"])
-
-    return df
+    return df_facture
