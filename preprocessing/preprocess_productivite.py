@@ -2,7 +2,6 @@
 
 import pandas as pd
 
-
 def preprocess_productivite(df_raw: pd.DataFrame) -> pd.DataFrame:
     """
     Préprocessing Productivité
@@ -23,7 +22,7 @@ def preprocess_productivite(df_raw: pd.DataFrame) -> pd.DataFrame:
     required_cols = [
         "Saisie heures - Date",
         "Salarié - Nom",
-        "Equipe",
+        "Equipe3",
         "Facturable",
         "Hr_travaillée",
         "Hr_Totale",
@@ -58,7 +57,7 @@ def preprocess_productivite(df_raw: pd.DataFrame) -> pd.DataFrame:
             [
                 "Saisie heures - Date",
                 "Salarié - Nom",
-                "Equipe",
+                "Equipe3",
                 "Jour_semaine",
                 "Hr_Théorique"
                 "Hr_Totale"
