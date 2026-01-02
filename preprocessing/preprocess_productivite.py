@@ -25,7 +25,7 @@ def preprocess_productivite(df_raw: pd.DataFrame) -> pd.DataFrame:
         "Salarié - Nom",
         "Salarié - Equipe(Nom)",
         "Facturable",
-        "Hr_travaillée"
+        "Hr_travaillée",
         "Hr_Totale",
         "Hr_Théorique",
         "Jour_semaine"
