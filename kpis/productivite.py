@@ -28,6 +28,9 @@ def page_productivite():
         type=["xlsx"],
         key="productivite_upload"
     )
+    for c in df.columns:
+        print(f"'{c}'")
+
 
     if not uploaded_file:
         st.info("Veuillez charger le fichier d’extraction.")
