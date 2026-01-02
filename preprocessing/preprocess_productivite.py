@@ -23,7 +23,7 @@ def preprocess_productivite(df_raw: pd.DataFrame) -> pd.DataFrame:
     required_cols = [
         "Saisie heures - Date",
         "Salarié - Nom",
-        "Salarié - Equipe(Nom)",
+        "Salarié-Equipe(Nom)",
         "Facturable",
         "Hr_travaillée",
         "Hr_Totale",
@@ -58,7 +58,7 @@ def preprocess_productivite(df_raw: pd.DataFrame) -> pd.DataFrame:
             [
                 "Saisie heures - Date",
                 "Salarié - Nom",
-                "Salarié - Equipe(Nom)",
+                "Salarié-Equipe(Nom)",
                 "Jour_semaine",
                 "Hr_Théorique"
                 "Hr_Totale"
