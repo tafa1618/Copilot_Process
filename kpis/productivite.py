@@ -23,7 +23,7 @@ def preprocess_productivite(df_raw: pd.DataFrame) -> pd.DataFrame:
     # Les noms doivent correspondre EXACTEMENT à ton fichier Excel
     COL_DATE = "Saisie heures - Date"
     COL_NOM = "Salarié - Nom"
-    COL_EQUIPE = "Salarié - Equipe(Nom)"
+    COL_EQUIPE = "Salarié - Equipe (Nom)"
     COL_FACT = "Facturable"
     COL_TRAV = "Hr_travaillée"
     COL_TOT = "Hr_Totale"
