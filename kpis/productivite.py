@@ -56,7 +56,7 @@ def page_productivite():
     col1, col2 = st.columns(2)
 
     with col1:
-        equipes = sorted(df["Salarié - Equipe (Nom)"].unique())
+        equipes = sorted(df["Salarié-Equipe(Nom)"].unique())
         equipes_sel = st.multiselect(
             "Équipes",
             equipes,
@@ -72,7 +72,7 @@ def page_productivite():
         )
 
     df = df[
-        (df["Salarié - Equipe(Nom)"].isin(equipes_sel)) &
+        (df["Salarié-Equipe(Nom)"].isin(equipes_sel)) &
         (df["Mois"] == mois_sel)
     ]
 
