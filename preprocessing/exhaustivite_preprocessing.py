@@ -47,7 +47,7 @@ def compute_exhaustivite(df: pd.DataFrame) -> dict:
             ).fillna(0).to_dict(orient="index"),
 
             "teams": (
-                df_m.groupby("Salarié - Nom")["Salarié - Equipe(Nom)"]
+                df_m.groupby("Salarié - Nom")["Equipe3"]
                 .first()
                 .to_dict()
             )
