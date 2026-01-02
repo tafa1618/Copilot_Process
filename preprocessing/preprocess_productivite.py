@@ -12,6 +12,10 @@ def preprocess_productivite(df_raw: pd.DataFrame) -> pd.DataFrame:
     """
 
     df = df_raw.copy()
+    st.write("Colonnes détectées :")
+    for c in df.columns:
+        st.write(f"'{c}'")
+
 
     # ==================================================
     # COLONNES MINIMALES REQUISES
