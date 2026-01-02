@@ -56,7 +56,7 @@ def page_productivite():
     col1, col2 = st.columns(2)
 
     with col1:
-        equipes = sorted(df["Salarié - Equipe(Nom)"].unique())
+        equipes = sorted(df["Salarié - Equipe (Nom)"].unique())
         equipes_sel = st.multiselect(
             "Équipes",
             equipes,
