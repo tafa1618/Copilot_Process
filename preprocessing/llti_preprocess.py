@@ -2,6 +2,33 @@
 
 import pandas as pd
 from datetime import datetime
+from typing import Optional
+
+
+def _parse_date_series(s: pd.Series, prefer_dayfirst: Optional[bool] = None) -> pd.Series:
+    """Parse une Series de dates en testant dayfirst=True et dayfirst=False et
+    en retenant la conversion la plus complète.
+
+    Si `prefer_dayfirst` est True/False, on force cette reconstruction.
+    """
+    if s is None:
+        return s
+    if hasattr(s, 'dtype') and (str(s.dtype).startswith('datetime') or s.dtype == 'datetime64[ns]'):
+        return s
+    try:
+        parsed_df = pd.to_datetime(s, errors='coerce', dayfirst=True)
+    except TypeError:
+        parsed_df = pd.to_datetime(s, errors='coerce')
+    parsed_en = pd.to_datetime(s, errors='coerce', dayfirst=False)
+
+    if prefer_dayfirst is True:
+        return parsed_df
+    if prefer_dayfirst is False:
+        return parsed_en
+
+    if parsed_df.notna().sum() >= parsed_en.notna().sum():
+        return parsed_df
+    return parsed_en
 
 
 # ======================================================
@@ -22,9 +49,8 @@ def load_bo_file(file) -> pd.DataFrame:
 def filter_current_quarter(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
-    df["Date Facture (Lignes)"] = pd.to_datetime(
-        df["Date Facture (Lignes)"], errors="coerce"
-    )
+    # Les dates dans les fichiers BO sont en format français (jour/mois/année)
+    df["Date Facture (Lignes)"] = _parse_date_series(df["Date Facture (Lignes)"], prefer_dayfirst=True)
 
     today = datetime.today()
     current_quarter = (today.month - 1) // 3 + 1
@@ -115,8 +141,8 @@ def preprocess_llti(file) -> pd.DataFrame:
     df = select_llti_columns(df)
 
     # Assurer les types dates
-    df["Date Facture (Lignes)"] = pd.to_datetime(df["Date Facture (Lignes)"], errors="coerce")
-    df["Pointage dernière date (Segment)"] = pd.to_datetime(df["Pointage dernière date (Segment)"], errors="coerce")
+    df["Date Facture (Lignes)"] = _parse_date_series(df["Date Facture (Lignes)"], prefer_dayfirst=True)
+    df["Pointage dernière date (Segment)"] = _parse_date_series(df["Pointage dernière date (Segment)"], prefer_dayfirst=True)
 
     # Supprimer lignes sans dates valides ou sans numéro de facture
     df = df.dropna(subset=["Date Facture (Lignes)", "Pointage dernière date (Segment)", "N° Facture (Lignes)"])

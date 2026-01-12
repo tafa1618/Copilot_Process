@@ -34,6 +34,36 @@ def _find_column(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
     return None
 
 
+def _parse_date_series(s: pd.Series, prefer_dayfirst: Optional[bool] = None) -> pd.Series:
+    """Parse une Series de dates en testant dayfirst=True et dayfirst=False et
+    en retenant la conversion la plus complète.
+
+    Si `prefer_dayfirst` est True/False, on force cette reconstruction (utile si
+    on sait qu'un fichier est en format français ou anglais).
+    """
+    if s is None:
+        return s
+    if hasattr(s, 'dtype') and (str(s.dtype).startswith('datetime') or s.dtype == 'datetime64[ns]'):
+        return s
+
+    # tenter les deux formats
+    try:
+        parsed_df = pd.to_datetime(s, errors='coerce', dayfirst=True)
+    except TypeError:
+        parsed_df = pd.to_datetime(s, errors='coerce')
+    parsed_en = pd.to_datetime(s, errors='coerce', dayfirst=False)
+
+    if prefer_dayfirst is True:
+        return parsed_df
+    if prefer_dayfirst is False:
+        return parsed_en
+
+    # fallback heuristique: garder celui qui parse le plus de dates
+    if parsed_df.notna().sum() >= parsed_en.notna().sum():
+        return parsed_df
+    return parsed_en
+
+
 def load_inspect_file(file) -> pd.DataFrame:
     """Charge un fichier d'inspections (Excel ou CSV) en DataFrame."""
     if isinstance(file, str):
@@ -127,7 +157,8 @@ def compute_inspection_rate(
     if serial_col is not None:
         inspect[serial_col] = inspect[serial_col].astype(str).str.strip()
     if date_col is not None:
-        inspect[date_col] = pd.to_datetime(inspect[date_col], errors="coerce")
+        # Les dates dans le fichier Cat Inspect sont en format anglais (month/day/year) -> prefer_dayfirst=False
+        inspect[date_col] = _parse_date_series(inspect[date_col], prefer_dayfirst=False)
 
     # --- Préparer set d'OR inspectés (toutes dates)
     inspected_or_set = set()
