@@ -126,6 +126,48 @@ def page_llti():
             use_container_width=True
         )
 
+    # =============================
+    # SIMULATEUR D'ACTIONS LLTI
+    # (adaptation Streamlit du widget ipywidgets fourni)
+    # =============================
+    st.subheader("Simulateur d'actions LLTI")
+
+    def calculer_n2(n1: int, m1: float, m2: float, objectif: float):
+        try:
+            numerateur = n1 * (m1 - objectif)
+            denominateur = objectif - m2
+            if denominateur <= 0:
+                return None
+            return int(numerateur / denominateur) + 1
+        except Exception:
+            return None
+
+    # Valeurs par défaut basées sur les données chargées
+    default_n1 = int(len(per_or)) if 'per_or' in locals() else 100
+    default_m1 = float(global_score) if (not pd.isna(global_score)) else 22.0
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        n1 = st.slider("OR clôturés (n1)", min_value=1, max_value=2000, step=1, value=max(10, default_n1))
+        m1 = st.slider("LLTI actuel (m1, jours)", min_value=1.0, max_value=100.0, step=0.5, value=round(default_m1,1))
+    with col_b:
+        objectif = st.slider("LLTI objectif (jours)", min_value=1.0, max_value=100.0, step=0.5, value=7.0)
+        m2 = st.slider("LLTI des nouveaux OR (m2, jours)", min_value=0.0, max_value=100.0, step=0.5, value=4.0)
+
+    # Calcul
+    n2 = calculer_n2(n1, m1, m2, objectif)
+
+    if n2 is not None:
+        st.success(
+            f"✅ Pour atteindre un LLTI de **{objectif} jours**, il faut clôturer **{n2} nouveaux OR** avec un LLTI de **{m2} jours**."
+        )
+    else:
+        st.error(
+            "❌ Erreur : les paramètres ne permettent pas d’atteindre l’objectif (LLTI trop élevé ou objectif irréaliste)."
+        )
+
+    st.divider()
+
     # Option export CSV
     csv = or_summary.to_csv(index=False)
     st.download_button("Télécharger le tableau (CSV)", csv, file_name="llti_facturations_a_la_traine.csv")
