@@ -7,6 +7,7 @@ from datetime import date
 from kpis.productivite import page_productivite
 from kpis.efficience import page_efficience
 from kpis.llti import page_llti
+from kpis.inspection import page_inspection
 
 
 # ===============================
@@ -157,8 +158,9 @@ elif st.session_state.page == "LLTI":
 # AUTRES PAGES (PLACEHOLDERS)
 # ===============================
 elif st.session_state.page == "Inspection":
-    st.header("🔍 Inspection Rate")
-    st.info("Page à implémenter")
+    page_inspection()
+
+    st.divider()
     if st.button("⬅️ Retour à l’accueil"):
         st.session_state.page = "Accueil"
 

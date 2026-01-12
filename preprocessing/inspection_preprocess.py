@@ -1,0 +1,230 @@
+import pandas as pd
+from datetime import datetime
+import unicodedata
+from typing import Optional, Tuple
+
+from .llti_preprocess import filter_current_quarter, filter_caterpillar, load_bo_file
+
+
+def _simplify(s: str) -> str:
+    if s is None:
+        return ""
+    if not isinstance(s, str):
+        s = str(s)
+    s = s.strip().lower()
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    return s
+
+
+def _find_column(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
+    cols = df.columns
+    simplified = {c: _simplify(c) for c in cols}
+    for cand in candidates:
+        sc = _simplify(cand)
+        for orig, simp in simplified.items():
+            if sc == simp:
+                return orig
+    # fallback: partial match
+    for cand in candidates:
+        sc = _simplify(cand)
+        for orig, simp in simplified.items():
+            if sc in simp or simp in sc:
+                return orig
+    return None
+
+
+def load_inspect_file(file) -> pd.DataFrame:
+    """Charge un fichier d'inspections (Excel ou CSV) en DataFrame."""
+    if isinstance(file, str):
+        try:
+            return pd.read_excel(file)
+        except Exception:
+            return pd.read_csv(file)
+    try:
+        return pd.read_excel(file)
+    except Exception:
+        try:
+            file.seek(0)
+        except Exception:
+            pass
+        return pd.read_csv(file)
+
+
+def load_pointages_file(file) -> pd.DataFrame:
+    if file is None:
+        return pd.DataFrame()
+    if isinstance(file, str):
+        return pd.read_excel(file)
+    return pd.read_excel(file)
+
+
+def compute_inspection_rate(
+    bo_file,
+    inspect_file,
+    pointage_file=None,
+) -> Tuple[float, pd.DataFrame]:
+    """Calcule l'Inspection Rate par facture.
+
+    Logique : pour chaque facture (N° Facture (Lignes)) du BO (filtré pour Caterpillar et trimestre courant) :
+     - si l'OR de la facture est trouvé dans le fichier `inspect`, la facture est considérée inspectée (méthode 'OR').
+     - sinon on regarde les numéros de série présents dans la facture ; si un de ces numéros de série a été inspecté pendant le trimestre courant, la facture est considérée inspectée (méthode 'Serial').
+     - sinon la facture est marquée non inspectée.
+
+    Retourne : (inspection_rate (0..1), dataframe détaillé par facture)
+    """
+    # --- Chargements
+    bo = load_bo_file(bo_file)
+    inspect = load_inspect_file(inspect_file)
+    pointages = load_pointages_file(pointage_file) if pointage_file is not None else pd.DataFrame()
+
+    # --- Filtres et validations
+    # Garder uniquement Caterpillar et trimestre courant
+    bo = filter_caterpillar(bo)
+    bo = filter_current_quarter(bo)
+
+    required_bo_cols = [
+        "N° Facture (Lignes)",
+        "N° OR (Segment)",
+        "Numéro série Equipement (Segment)",
+        "Constructeur de l'équipement",
+        "Date Facture (Lignes)",
+    ]
+    missing = [c for c in required_bo_cols if c not in bo.columns]
+    if missing:
+        raise ValueError(f"Colonnes manquantes dans BO pour le KPI Inspection: {missing}")
+
+    # --- Détecter colonnes utiles dans inspect
+    OR_CANDIDATES = [
+        "N° OR (Segment)", "N° OR", "OR", "Numéro OR", "N° OR (Lignes)", "N° OR (Or)", "ordre"
+    ]
+    SERIAL_CANDIDATES = [
+        "Numéro série Equipement (Segment)", "Numéro série", "Numéro de série", "numero serie", "serial number", "serial"
+    ]
+    DATE_CANDIDATES = ["Date inspection", "Date", "date", "Date d'inspection", "Date Controle"]
+    TECH_CANDIDATES = ["Technicien", "Technician", "Intervenant", "Salarié - Nom", "Nom"]
+
+    or_col = _find_column(inspect, OR_CANDIDATES)
+    serial_col = _find_column(inspect, SERIAL_CANDIDATES)
+    date_col = _find_column(inspect, DATE_CANDIDATES)
+    tech_col = _find_column(inspect, TECH_CANDIDATES)
+
+    # normaliser types
+    if or_col is not None:
+        inspect[or_col] = inspect[or_col].astype(str).str.strip()
+    if serial_col is not None:
+        inspect[serial_col] = inspect[serial_col].astype(str).str.strip()
+    if date_col is not None:
+        inspect[date_col] = pd.to_datetime(inspect[date_col], errors="coerce")
+
+    # --- Préparer set d'OR inspectés (toutes dates)
+    inspected_or_set = set()
+    if or_col is not None:
+        inspected_or_set = set(inspect[or_col].dropna().astype(str).str.strip().unique())
+
+    # --- Préparer série inspectées durant le trimestre courant
+    today = datetime.today()
+    current_q = (today.month - 1) // 3 + 1
+    current_y = today.year
+
+    inspected_serials_q = set()
+    if serial_col is not None and date_col is not None:
+        tmp = inspect.dropna(subset=[serial_col, date_col]).copy()
+        tmp = tmp[(tmp[date_col].dt.year == current_y) & (tmp[date_col].dt.quarter == current_q)]
+        inspected_serials_q = set(tmp[serial_col].astype(str).str.strip().unique())
+
+    # --- Préparer pointages recherche : déterminer la colonne OR et technicien dans pointages
+    pointage_or_col = None
+    possible_or_candidates = OR_CANDIDATES + ["N° OR", "N° OR (Segment)"]
+    if not pointages.empty:
+        pointage_or_col = _find_column(pointages, possible_or_candidates)
+        pointage_tech_col = _find_column(pointages, TECH_CANDIDATES)
+    else:
+        pointage_tech_col = None
+
+    # --- Agréger par facture
+    results = []
+    group = bo.groupby("N° Facture (Lignes)")
+    for facture, df_fact in group:
+        ors = df_fact["N° OR (Segment)"].dropna().astype(str).str.strip().unique().tolist()
+        serials = df_fact["Numéro série Equipement (Segment)"].dropna().astype(str).str.strip().unique().tolist()
+
+        inspected = False
+        method = None
+        inspect_dates = []
+        inspectors = []
+
+        # 1) OR match
+        for orv in ors:
+            if not orv or orv.lower() in ["nan", "none"]:
+                continue
+            # comparer string-wise
+            if orv in inspected_or_set:
+                inspected = True
+                method = "OR"
+                # collect dates & techs if available
+                if or_col is not None and date_col is not None:
+                    rows = inspect[inspect[or_col].astype(str).str.strip() == orv]
+                    inspect_dates += rows[date_col].dropna().astype(str).tolist()
+                    if tech_col is not None:
+                        inspectors += rows[tech_col].dropna().astype(str).tolist()
+                break
+
+        # 2) Serial match in quarter
+        if not inspected:
+            for s in serials:
+                if not s or s.lower() in ["nan", "none"]:
+                    continue
+                if s in inspected_serials_q:
+                    inspected = True
+                    method = "Serial"
+                    if serial_col is not None and date_col is not None:
+                        rows = inspect[inspect[serial_col].astype(str).str.strip() == s]
+                        # keep only those in current quarter
+                        if date_col is not None:
+                            rows = rows[(rows[date_col].dt.year == current_y) & (rows[date_col].dt.quarter == current_q)]
+                        inspect_dates += rows[date_col].dropna().astype(str).tolist()
+                        if tech_col is not None:
+                            inspectors += rows[tech_col].dropna().astype(str).tolist()
+                    break
+
+        # 3) Si pointages fournis, essayer trouver techniciens pointés sur l'OR
+        technicians = []
+        if pointage_or_col is not None and not pointages.empty:
+            # pour chaque OR de la facture, chercher dans pointages
+            for orv in ors:
+                if not orv or orv.lower() in ["nan", "none"]:
+                    continue
+                matched = pointages[pointages[pointage_or_col].astype(str).str.strip() == orv]
+                if not matched.empty and pointage_tech_col is not None:
+                    technicians += matched[pointage_tech_col].dropna().astype(str).unique().tolist()
+        # fallback: si pas de colonne OR dans pointages, essayer de chercher OR comme substring dans toute table (coûteux mais utile)
+        if pointage_or_col is None and not pointages.empty and ors:
+            for orv in ors:
+                mask = pointages.apply(lambda row: row.astype(str).str.contains(str(orv), case=False, na=False).any(), axis=1)
+                matched = pointages[mask]
+                if not matched.empty and pointage_tech_col is not None:
+                    technicians += matched[pointage_tech_col].dropna().astype(str).unique().tolist()
+
+        inspectors = list(dict.fromkeys(inspectors))
+        technicians = list(dict.fromkeys(technicians))
+
+        results.append({
+            "N° Facture": facture,
+            "ORs": ", ".join(ors) if ors else None,
+            "Serials": ", ".join(serials) if serials else None,
+            "Inspected": int(inspected),
+            "Method": method,
+            "InspectionDates": ", ".join(inspect_dates) if inspect_dates else None,
+            "Inspectors": ", ".join(inspectors) if inspectors else None,
+            "TechniciansPointed": ", ".join(technicians) if technicians else None,
+        })
+
+    df_res = pd.DataFrame(results)
+
+    total = len(df_res)
+    inspected_count = int(df_res["Inspected"].sum()) if total > 0 else 0
+
+    rate = inspected_count / total if total > 0 else 0.0
+
+    return rate, df_res
