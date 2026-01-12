@@ -67,6 +67,7 @@ def compute_inspection_rate(
     """Calcule l'Inspection Rate par facture.
 
     Logique : pour chaque facture (N° Facture (Lignes)) du BO (filtré pour Caterpillar et trimestre courant) :
+     - seules les lignes d'inspection avec un statut "Completed" sont prises en compte.
      - si l'OR de la facture est trouvé dans le fichier `inspect`, la facture est considérée inspectée (méthode 'OR').
      - sinon on regarde les numéros de série présents dans la facture ; si un de ces numéros de série a été inspecté pendant le trimestre courant, la facture est considérée inspectée (méthode 'Serial').
      - sinon la facture est marquée non inspectée.
@@ -96,18 +97,29 @@ def compute_inspection_rate(
 
     # --- Détecter colonnes utiles dans inspect
     OR_CANDIDATES = [
-        "N° OR (Segment)", "N° OR", "OR", "Numéro OR", "N° OR (Lignes)", "N° OR (Or)", "ordre"
+        "N° OR (Segment)", "N° OR", "OR", "Numéro OR", "N° OR (Lignes)", "N° OR (Or)", "ordre", "Work Order Number", "Work Order No", "Work Order"
     ]
     SERIAL_CANDIDATES = [
-        "Numéro série Equipement (Segment)", "Numéro série", "Numéro de série", "numero serie", "serial number", "serial"
+        "Numéro série Equipement (Segment)", "Numéro série", "Numéro de série", "numero serie", "serial number", "serial", "S/N", "SN"
     ]
-    DATE_CANDIDATES = ["Date inspection", "Date", "date", "Date d'inspection", "Date Controle"]
+    DATE_CANDIDATES = ["Date inspection", "Date", "date", "Date d'inspection", "Date Controle", "Complete Date (UTC)", "Complete Date"]
     TECH_CANDIDATES = ["Technicien", "Technician", "Intervenant", "Salarié - Nom", "Nom"]
+    STATUS_CANDIDATES = ["Status", "Statut", "Status Description"]
+    CUSTOMER_CANDIDATES = ["Customer Name", "Customer", "Nom client", "Client"]
 
     or_col = _find_column(inspect, OR_CANDIDATES)
     serial_col = _find_column(inspect, SERIAL_CANDIDATES)
     date_col = _find_column(inspect, DATE_CANDIDATES)
     tech_col = _find_column(inspect, TECH_CANDIDATES)
+    status_col = _find_column(inspect, STATUS_CANDIDATES)
+    customer_col = _find_column(inspect, CUSTOMER_CANDIDATES)
+
+    # --- Normaliser et filtrer : ne garder que les inspections avec statut "Completed"
+    if status_col is not None:
+        inspect[status_col] = inspect[status_col].astype(str).str.strip()
+        # considérer différents libellés courants (en/ fr)
+        completed_mask = inspect[status_col].str.lower().str.contains(r"completed|complete|termin[eé]s?|termine|fini|done", regex=True, na=False)
+        inspect = inspect[completed_mask]
 
     # normaliser types
     if or_col is not None:
@@ -135,12 +147,21 @@ def compute_inspection_rate(
 
     # --- Préparer pointages recherche : déterminer la colonne OR et technicien dans pointages
     pointage_or_col = None
-    possible_or_candidates = OR_CANDIDATES + ["N° OR", "N° OR (Segment)"]
+    possible_or_candidates = OR_CANDIDATES + ["N° OR", "N° OR (Segment)", "OR (Numéro)", "OR Number", "OR"]
+    # colonnes spécifiques à récupérer pour le suivi
+    POINTAGE_NAME_CANDIDATES = ["Salarié - Nom", "Nom Salarié", "Technicien", "Nom", "Employee Name"]
+    POINTAGE_TEAM_CANDIDATES = ["Salarié - Equipe(Nom)", "Equipe", "Team", "Equipe (Nom)", "Team Name", "Equipe Nom"]
+    POINTAGE_ORNUM_CANDIDATES = ["OR (Numéro)", "OR Number", "N° OR", "OR", "Order Number"]
+
     if not pointages.empty:
         pointage_or_col = _find_column(pointages, possible_or_candidates)
-        pointage_tech_col = _find_column(pointages, TECH_CANDIDATES)
+        pointage_tech_col = _find_column(pointages, POINTAGE_NAME_CANDIDATES + TECH_CANDIDATES)
+        pointage_team_col = _find_column(pointages, POINTAGE_TEAM_CANDIDATES)
+        pointage_or_num_col = _find_column(pointages, POINTAGE_ORNUM_CANDIDATES)
     else:
         pointage_tech_col = None
+        pointage_team_col = None
+        pointage_or_num_col = None
 
     # --- Agréger par facture
     results = []
@@ -153,6 +174,7 @@ def compute_inspection_rate(
         method = None
         inspect_dates = []
         inspectors = []
+        customers = []
 
         # 1) OR match
         for orv in ors:
@@ -160,16 +182,17 @@ def compute_inspection_rate(
                 continue
             # comparer string-wise
             if orv in inspected_or_set:
-                inspected = True
-                method = "OR"
-                # collect dates & techs if available
-                if or_col is not None and date_col is not None:
-                    rows = inspect[inspect[or_col].astype(str).str.strip() == orv]
-                    inspect_dates += rows[date_col].dropna().astype(str).tolist()
-                    if tech_col is not None:
-                        inspectors += rows[tech_col].dropna().astype(str).tolist()
-                break
-
+                    inspected = True
+                    method = "OR"
+                    # collect dates, techs & customers if available
+                    if or_col is not None and date_col is not None:
+                        rows = inspect[inspect[or_col].astype(str).str.strip() == orv]
+                        inspect_dates += rows[date_col].dropna().astype(str).tolist()
+                        if tech_col is not None:
+                            inspectors += rows[tech_col].dropna().astype(str).tolist()
+                        if customer_col is not None:
+                            customers += rows[customer_col].dropna().astype(str).tolist()
+                    break
         # 2) Serial match in quarter
         if not inspected:
             for s in serials:
@@ -186,28 +209,59 @@ def compute_inspection_rate(
                         inspect_dates += rows[date_col].dropna().astype(str).tolist()
                         if tech_col is not None:
                             inspectors += rows[tech_col].dropna().astype(str).tolist()
-                    break
-
-        # 3) Si pointages fournis, essayer trouver techniciens pointés sur l'OR
+                        if customer_col is not None:
+                            customers += rows[customer_col].dropna().astype(str).tolist()
+        # --- Pointages : extraire nom, équipe, OR (numéro) pour suivi
         technicians = []
-        if pointage_or_col is not None and not pointages.empty:
-            # pour chaque OR de la facture, chercher dans pointages
-            for orv in ors:
-                if not orv or orv.lower() in ["nan", "none"]:
-                    continue
-                matched = pointages[pointages[pointage_or_col].astype(str).str.strip() == orv]
-                if not matched.empty and pointage_tech_col is not None:
-                    technicians += matched[pointage_tech_col].dropna().astype(str).unique().tolist()
-        # fallback: si pas de colonne OR dans pointages, essayer de chercher OR comme substring dans toute table (coûteux mais utile)
-        if pointage_or_col is None and not pointages.empty and ors:
-            for orv in ors:
-                mask = pointages.apply(lambda row: row.astype(str).str.contains(str(orv), case=False, na=False).any(), axis=1)
-                matched = pointages[mask]
-                if not matched.empty and pointage_tech_col is not None:
-                    technicians += matched[pointage_tech_col].dropna().astype(str).unique().tolist()
+        pointage_records = []
+        if not pointages.empty:
+            if pointage_or_col is not None:
+                for orv in ors:
+                    if not orv or orv.lower() in ["nan", "none"]:
+                        continue
+                    matched = pointages[pointages[pointage_or_col].astype(str).str.strip() == orv]
+                    if not matched.empty:
+                        for _, r in matched.iterrows():
+                            name = None
+                            team = None
+                            ornum = None
+                            if pointage_tech_col is not None and pointage_tech_col in matched.columns and pd.notna(r.get(pointage_tech_col)):
+                                name = str(r.get(pointage_tech_col)).strip()
+                            if pointage_team_col is not None and pointage_team_col in matched.columns and pd.notna(r.get(pointage_team_col)):
+                                team = str(r.get(pointage_team_col)).strip()
+                            if pointage_or_num_col is not None and pointage_or_num_col in matched.columns and pd.notna(r.get(pointage_or_num_col)):
+                                ornum = str(r.get(pointage_or_num_col)).strip()
+                            else:
+                                ornum = orv
+                            if name:
+                                technicians.append(name)
+                            record = "; ".join(x for x in [name, team, f"OR:{ornum}"] if x)
+                            pointage_records.append(record)
+            else:
+                for orv in ors:
+                    mask = pointages.apply(lambda row: row.astype(str).str.contains(str(orv), case=False, na=False).any(), axis=1)
+                    matched = pointages[mask]
+                    if not matched.empty:
+                        for _, r in matched.iterrows():
+                            name = None
+                            team = None
+                            ornum = None
+                            if pointage_tech_col is not None and pointage_tech_col in matched.columns and pd.notna(r.get(pointage_tech_col)):
+                                name = str(r.get(pointage_tech_col)).strip()
+                            if pointage_team_col is not None and pointage_team_col in matched.columns and pd.notna(r.get(pointage_team_col)):
+                                team = str(r.get(pointage_team_col)).strip()
+                            if pointage_or_num_col is not None and pointage_or_num_col in matched.columns and pd.notna(r.get(pointage_or_num_col)):
+                                ornum = str(r.get(pointage_or_num_col)).strip()
+                            else:
+                                ornum = orv
+                            if name:
+                                technicians.append(name)
+                            record = "; ".join(x for x in [name, team, f"OR:{ornum}"] if x)
+                            pointage_records.append(record)
 
         inspectors = list(dict.fromkeys(inspectors))
         technicians = list(dict.fromkeys(technicians))
+        pointage_records = list(dict.fromkeys(pointage_records))
 
         results.append({
             "N° Facture": facture,
@@ -217,6 +271,8 @@ def compute_inspection_rate(
             "Method": method,
             "InspectionDates": ", ".join(inspect_dates) if inspect_dates else None,
             "Inspectors": ", ".join(inspectors) if inspectors else None,
+            "Customers": ", ".join(customers) if customers else None,
+            "PointageRecords": ", ".join(pointage_records) if pointage_records else None,
             "TechniciansPointed": ", ".join(technicians) if technicians else None,
         })
 
