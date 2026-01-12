@@ -6,6 +6,7 @@ from datetime import date
 # ===============================
 from kpis.productivite import page_productivite
 from kpis.efficience import page_efficience
+from kpis.llti import page_llti
 
 
 # ===============================
@@ -112,6 +113,9 @@ if st.session_state.page == "Accueil":
         if st.button("🧪 PIP"):
             st.session_state.page = "PIP"
 
+        if st.button("📉 LLTI"):
+            st.session_state.page = "LLTI"
+
 
 # ===============================
 # PAGE PRODUCTIVITÉ
@@ -131,6 +135,18 @@ elif st.session_state.page == "Productivité":
 elif st.session_state.page == "Efficience":
 
     page_efficience()
+
+    st.divider()
+    if st.button("⬅️ Retour à l’accueil"):
+        st.session_state.page = "Accueil"
+
+
+# ===============================
+# PAGE LLTI
+# ===============================
+elif st.session_state.page == "LLTI":
+
+    page_llti()
 
     st.divider()
     if st.button("⬅️ Retour à l’accueil"):
