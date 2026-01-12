@@ -46,11 +46,33 @@ def page_llti():
         st.warning("Aucune ligne Caterpillar trouvée pour le trimestre courant.")
         return
 
-    # Calcul jours d'écart
-    df["Days_diff"] = (df["Date Facture (Lignes)"] - df["Pointage dernière date (Segment)"]).dt.days
+    # --- Calcul en se focalisant sur la facture la plus récente par OR ---
+    # Dates déjà en datetime dans le pipeline, mais on s'assure
+    df["Date Facture (Lignes)"] = pd.to_datetime(df["Date Facture (Lignes)"], errors="coerce")
+    df["Pointage dernière date (Segment)"] = pd.to_datetime(df["Pointage dernière date (Segment)"], errors="coerce")
 
-    # Score global (moyenne en jours calendaires)
-    global_score = df["Days_diff"].mean()
+    # Pour chaque OR : ligne de la facture la plus récente
+    idx_latest_inv = df.groupby("N° OR (Segment)")["Date Facture (Lignes)"].idxmax()
+    latest_invoices = df.loc[idx_latest_inv, ["N° OR (Segment)", "N° Facture (Lignes)", "Date Facture (Lignes)", "Nom Client OR (or)"]].copy()
+    latest_invoices = latest_invoices.rename(columns={
+        "N° Facture (Lignes)": "Last_invoice_number",
+        "Date Facture (Lignes)": "Last_invoice_date"
+    })
+
+    # Pour chaque OR : pointage le plus récent (peut être différent de la ligne de facture)
+    last_pointages = (
+        df
+        .groupby("N° OR (Segment)", as_index=False)["Pointage dernière date (Segment)"].max()
+        .rename(columns={"Pointage dernière date (Segment)": "Last_pointage_date"})
+    )
+
+    per_or = latest_invoices.merge(last_pointages, on="N° OR (Segment)", how="left")
+
+    # Calcul Days_diff = Last_invoice_date - Last_pointage_date (en jours)
+    per_or["Days_diff"] = (per_or["Last_invoice_date"] - per_or["Last_pointage_date"]).dt.days
+
+    # Score global : moyenne des Days_diff (une valeur par OR)
+    global_score = per_or["Days_diff"].mean()
 
     # Affichage score avec code couleur
     label, color = _llti_color(global_score)
@@ -66,34 +88,43 @@ def page_llti():
 
     st.divider()
 
-    # Tableau des facturations à la traîne
+    # Tableau des facturations à la traîne — basé sur la facture la plus récente par OR
     st.subheader("Facturations à la traîne")
 
+    # Nombre de factures par OR (pour information)
+    n_inv = df.groupby("N° OR (Segment)", as_index=False)["N° Facture (Lignes)"].nunique().rename(columns={"N° Facture (Lignes)": "n_invoices"})
+
     or_summary = (
-        df
-        .groupby(["N° OR (Segment)", "Nom Client OR (or)"], as_index=False)
-        .agg(
-            avg_days=("Days_diff", "mean"),
-            max_days=("Days_diff", "max"),
-            n_invoices=("N° Facture (Lignes)", "nunique"),
-            last_facture=("Date Facture (Lignes)", "max"),
-            last_pointage=("Pointage dernière date (Segment)", "max"),
-        )
-        .sort_values("avg_days", ascending=False)
+        per_or
+        .merge(n_inv, on="N° OR (Segment)", how="left")
+        .rename(columns={
+            "Last_invoice_date": "last_facture",
+            "Last_pointage_date": "last_pointage",
+            "Last_invoice_number": "N° Facture (Lignes)",
+            "Days_diff": "Days_diff"
+        })
+        .sort_values("Days_diff", ascending=False)
     )
 
     st.dataframe(
         or_summary.head(20).assign(
-            avg_days=lambda d: d["avg_days"].round(1),
-            max_days=lambda d: d["max_days"].astype(int)
+            Days_diff=lambda d: d["Days_diff"].astype(float).round(1),
+            n_invoices=lambda d: d["n_invoices"].fillna(0).astype(int)
         ),
         use_container_width=True
     )
 
     st.info(
-        "Les OR listés ci-dessus sont triés par moyenne d'écart (Date Facture - Pointage). "
-        "Utilisez cette liste pour prioriser les relances auprès des clients."
+        "Les lignes ci-dessus montrent, pour chaque OR, la facture la plus récente et le nombre total de factures."
     )
+
+    # Détails : liste des factures (triées) pour investigation
+    with st.expander("Voir les factures détaillées (triées par écart)"):
+        st.dataframe(
+            df.assign(Days_diff=lambda d: (d["Date Facture (Lignes)"] - d["Pointage dernière date (Segment)"]).dt.days)
+            .sort_values("Days_diff", ascending=False).head(200),
+            use_container_width=True
+        )
 
     # Option export CSV
     csv = or_summary.to_csv(index=False)
