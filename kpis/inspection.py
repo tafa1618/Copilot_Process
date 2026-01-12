@@ -65,9 +65,13 @@ def page_inspection():
     # Petite visualisation
     if not df_res.empty:
         fig, ax = plt.subplots(figsize=(6, 3))
-        df_plot = df_res[~df_res["Method"].isna()].copy()
+        df_plot = df_res.copy()
         df_plot["Method"] = df_plot["Method"].fillna("None")
-        df_plot.groupby("Method")["N° Facture"].count().plot(kind="bar", ax=ax)
-        ax.set_ylabel("Nombre de factures")
-        ax.set_title("Répartition par méthode d'identification")
-        st.pyplot(fig)
+        counts = df_plot.groupby("Method")["N° Facture"].count()
+        if counts.empty:
+            st.info("Aucune donnée disponible pour la visualisation (pas de méthode identifiée).")
+        else:
+            counts.plot(kind="bar", ax=ax)
+            ax.set_ylabel("Nombre de factures")
+            ax.set_title("Répartition par méthode d'identification")
+            st.pyplot(fig)
