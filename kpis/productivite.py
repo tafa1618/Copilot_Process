@@ -520,6 +520,7 @@ def page_productivite():
     # ==================================================
     if correlations:
         corr_df = pd.DataFrame(correlations).dropna()
+    if not corr_df.empty:
         equipe_driver = corr_df.sort_values(
             "Corrélation", ascending=False
         ).iloc[0]
@@ -531,4 +532,5 @@ def page_productivite():
             f"(corrélation = {equipe_driver['Corrélation']:.2f}).\n\n"
             f"👉 Son évolution constitue un **bon proxy** de la tendance globale."
         )
-
+    else:
+        st.info("Aucune corrélation calculable pour les équipes sélectionnées.")
