@@ -38,6 +38,24 @@ def page_productivite():
     df = load_pointages(uploaded_file)
     st.subheader("Aperçu des données")
     st.dataframe(df.head())
+
+    # --- Validation colonnes attendues ---
+    required_cols = [
+        "Salarié - Nom",
+        "Salarié - Equipe(Nom)",
+        "Facturable",
+        "Hr_travaillée",
+        "Saisie heures - Date"
+    ]
+    missing = [c for c in required_cols if c not in df.columns]
+    if missing:
+        st.error(
+            "Le fichier chargé ne contient pas toutes les colonnes attendues. "
+            f"Colonnes manquantes: {missing}"
+        )
+        st.info(f"Colonnes présentes: {list(df.columns)}")
+        return
+
     st.divider()
 
     # ==================================================
