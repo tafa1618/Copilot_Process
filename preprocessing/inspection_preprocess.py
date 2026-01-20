@@ -195,7 +195,7 @@ def compute_inspection_rate(
 
     if not pointages.empty:
         # Valider les colonnes attendues pour les pointages
-        required_pointage_cols = ["Salarié - Nom", "OR (Numéro)"]  # Colonnes essentielles pour les pointages
+        required_pointage_cols = ["Salarié - Nom", "OR (Numéro)", "Salarié - Equipe(Nom)", "Saisie heures - Date"]  # Colonnes essentielles pour les pointages
         try:
             validate_required_columns(pointages, required_pointage_cols)
         except ValueError as e:
