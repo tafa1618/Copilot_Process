@@ -4,6 +4,7 @@ import unicodedata
 from typing import Optional, Tuple
 
 from .llti_preprocess import filter_current_quarter, filter_caterpillar, load_bo_file
+from column_validation import validate_required_columns
 
 
 def _simplify(s: str) -> str:
@@ -121,9 +122,10 @@ def compute_inspection_rate(
         "Constructeur de l'équipement",
         "Date Facture (Lignes)",
     ]
-    missing = [c for c in required_bo_cols if c not in bo.columns]
-    if missing:
-        raise ValueError(f"Colonnes manquantes dans BO pour le KPI Inspection: {missing}")
+    try:
+        validate_required_columns(bo, required_bo_cols)
+    except ValueError as e:
+        raise ValueError(f"Problème avec les colonnes du fichier BO : {e}")
 
     # --- Détecter colonnes utiles dans inspect
     OR_CANDIDATES = [
@@ -136,6 +138,13 @@ def compute_inspection_rate(
     TECH_CANDIDATES = ["Technicien", "Technician", "Intervenant", "Salarié - Nom", "Nom"]
     STATUS_CANDIDATES = ["Status", "Statut", "Status Description"]
     CUSTOMER_CANDIDATES = ["Customer Name", "Customer", "Nom client", "Client"]
+
+    # Valider les colonnes essentielles pour le fichier inspect
+    required_inspect_cols = ["Status"]  # Au moins le statut pour filtrer
+    try:
+        validate_required_columns(inspect, required_inspect_cols)
+    except ValueError as e:
+        raise ValueError(f"Problème avec les colonnes du fichier Cat Inspect : {e}")
 
     or_col = _find_column(inspect, OR_CANDIDATES)
     serial_col = _find_column(inspect, SERIAL_CANDIDATES)
@@ -185,6 +194,13 @@ def compute_inspection_rate(
     POINTAGE_ORNUM_CANDIDATES = ["OR (Numéro)", "OR Number", "N° OR", "OR", "Order Number"]
 
     if not pointages.empty:
+        # Valider les colonnes attendues pour les pointages
+        required_pointage_cols = ["Salarié - Nom", "OR (Numéro)"]  # Colonnes essentielles pour les pointages
+        try:
+            validate_required_columns(pointages, required_pointage_cols)
+        except ValueError as e:
+            raise ValueError(f"Problème avec les colonnes du fichier de pointages : {e}")
+        
         pointage_or_col = _find_column(pointages, possible_or_candidates)
         pointage_tech_col = _find_column(pointages, POINTAGE_NAME_CANDIDATES + TECH_CANDIDATES)
         pointage_team_col = _find_column(pointages, POINTAGE_TEAM_CANDIDATES)
