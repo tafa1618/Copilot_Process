@@ -7,15 +7,12 @@ from .llti_preprocess import filter_current_quarter, filter_caterpillar, load_bo
 from column_validation import validate_required_columns
 
 
+from column_validation import normalize_column_name
+
+
 def _simplify(s: str) -> str:
-    if s is None:
-        return ""
-    if not isinstance(s, str):
-        s = str(s)
-    s = s.strip().lower()
-    s = unicodedata.normalize("NFKD", s)
-    s = "".join(ch for ch in s if not unicodedata.combining(ch))
-    return s
+    # Utiliser la même normalisation que validate_required_columns
+    return normalize_column_name(s)
 
 
 def _find_column(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
@@ -194,13 +191,6 @@ def compute_inspection_rate(
     POINTAGE_ORNUM_CANDIDATES = ["OR (Numéro)", "OR Number", "N° OR", "OR", "Order Number"]
 
     if not pointages.empty:
-        # Valider les colonnes attendues pour les pointages
-        required_pointage_cols = ["Salarié - Nom", "OR (Numéro)", "Salarié - Equipe (Nom)", "Saisie heures - Date"]  # Colonnes essentielles pour les pointages
-        try:
-            validate_required_columns(pointages, required_pointage_cols)
-        except ValueError as e:
-            raise ValueError(f"Problème avec les colonnes du fichier de pointages : {e}")
-        
         pointage_or_col = _find_column(pointages, possible_or_candidates)
         pointage_tech_col = _find_column(pointages, POINTAGE_NAME_CANDIDATES + TECH_CANDIDATES)
         pointage_team_col = _find_column(pointages, POINTAGE_TEAM_CANDIDATES)
